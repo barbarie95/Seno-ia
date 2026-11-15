@@ -171,7 +171,7 @@ var $=function(id){return document.getElementById(id)};
 var tiroir=$("tiroir"),voile=$("voile"),listeConv=$("liste-conv");
 var messages=$("messages"),interieur=$("messages-interieur");
 var champ=$("champ"),boutonEnvoyer=$("envoyer"),titreConv=$("titre-conv");
-var note=$("note-saisie"),boutonMenu=$("bouton-menu");
+var boutonMenu=$("bouton-menu");
 var apercus=$("apercus"),boutonPhoto=$("ajouter-photo"),champPhoto=$("photo");
 var etat={utilisateur:null,convId:"",envoi:false,conversations:[]};
 var mobile=window.matchMedia("(max-width:959px)");
@@ -240,10 +240,6 @@ var z=document.createElement("div");
 z.className="alerte alerte-erreur";
 z.setAttribute("role","alert");z.textContent=texte;
 interieur.appendChild(z);defiler();
-}
-function majRestants(n){
-if(typeof n!=="number")return;
-note.textContent="Il te reste "+n+" message"+(n>1?"s":"")+" aujourd'hui. Seno IA peut se tromper : vérifie les informations importantes.";
 }
 
 /* Photos : lecture, réduction et conversion d'une photo en JPEG (base64) */
@@ -436,7 +432,6 @@ etat.convId=r.conversation_id;
 if(r.propose_recherche)afficherProposition(texte);
 else{
 ajouterBulle("ia",r.reponse,r.source);
-majRestants(r.messages_restants);
 }
 if(nouvelle){
 await chargerConversations();
