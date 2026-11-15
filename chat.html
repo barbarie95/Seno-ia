@@ -3,32 +3,41 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Discussion – Jupiter IA</title>
+<title>Discussion – Seno IA</title>
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#FFFFFF">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2363DCCB'/%3E%3Ctext x='32' y='46' font-size='40' font-weight='700' text-anchor='middle' fill='%23073B46' font-family='Arial'%3EJ%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="Logo%20Seno%20IA.png">
 <style>
-:root{--t:#073B46;--g:#63DCCB;--p:#e9faf7;--b:#e7eeee;--s:#4F6B70}
+/* ===== COULEURS : pour changer le thème, modifier uniquement ce bloc ===== */
+:root{
+--t:#26345B;            /* texte principal (bleu marine) */
+--g:#7A5CE6;            /* accent (bordure de saisie, points d'attente) */
+--degrade:linear-gradient(135deg,#2370CC,#6D4FE0); /* boutons principaux */
+--p:#ECF1FF;            /* fond clair teinté (bulle utilisateur) */
+--b:#E6EAF5;            /* bordures */
+--s:#5B6785;            /* texte secondaire */
+--glow:rgba(136,103,232,.22);  /* halo doux */
+}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:Arial,sans-serif;background:white;color:var(--t)}
 button,textarea{font:inherit}button{cursor:pointer}.cache{display:none!important}
-:focus-visible{outline:3px solid #0B7A6E;outline-offset:2px}
+:focus-visible{outline:3px solid #5B3FD0;outline-offset:2px}
 .app-chat{display:flex;width:100%;height:100vh;height:100dvh;overflow:hidden}
-.tiroir{width:280px;min-width:280px;background:#f7fbfa;border-right:1px solid var(--b);display:flex;flex-direction:column;z-index:20}
-.tiroir-tete{padding:19px 15px;display:flex;justify-content:space-between;align-items:center}
-.logo{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--t);font-size:20px;font-weight:700}
-.logo-pastille{width:36px;height:36px;display:grid;place-items:center;border-radius:11px;background:var(--g);font-size:22px}
+.tiroir{width:280px;min-width:280px;background:#F8FAFF;border-right:1px solid var(--b);display:flex;flex-direction:column;z-index:20}
+.tiroir-tete{padding:15px;display:flex;justify-content:space-between;align-items:center}
+.logo{display:flex;align-items:center;text-decoration:none;color:var(--t)}
+.logo-img{height:56px;width:auto;max-width:200px;display:block;object-fit:contain;mix-blend-mode:multiply;transition:transform .3s}
 .bouton{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;border:0;border-radius:11px;padding:11px 15px;font-size:13px;font-weight:600;text-decoration:none;transition:.2s}
-.bouton-principal{background:var(--g);color:var(--t)}
-.bouton-principal:hover{background:#45cbb9}
+.bouton-principal{background:var(--degrade);color:#fff}
+.bouton-principal:hover{filter:brightness(1.1)}
 .bouton-secondaire{background:white;border:1px solid var(--b);color:var(--t)}
 .bouton-secondaire:hover{background:var(--p)}
 .bouton-bloc{width:100%;padding:13px;justify-content:flex-start;text-align:left}
 .liste-conv{flex:1;overflow-y:auto;padding:15px 10px}
-.conv{display:flex;align-items:center;gap:5px;margin-bottom:5px;border-radius:10px;padding:4px}
-.conv:hover,.conv.active{background:#e9f4f2}
+.conv{display:flex;align-items:center;gap:5px;margin-bottom:5px;border-radius:10px;padding:4px;transition:background .2s}
+.conv:hover,.conv.active{background:#EAF0FF}
 .conv .titre{flex:1;min-width:0;min-height:44px;border:0;background:transparent;color:var(--t);text-align:left;padding:9px 7px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.suppr{display:grid;place-items:center;min-width:44px;min-height:44px;border:0;background:transparent;color:#5F7377;padding:7px;border-radius:7px}
+.suppr{display:grid;place-items:center;min-width:44px;min-height:44px;border:0;background:transparent;color:var(--s);padding:7px;border-radius:7px}
 .suppr:hover{color:#B83232;background:white}
 .tiroir-pied{border-top:1px solid var(--b);padding:14px;display:flex;flex-wrap:wrap;gap:8px}
 .discret{color:var(--s);font-size:12px}
@@ -39,38 +48,39 @@ button,textarea{font:inherit}button{cursor:pointer}.cache{display:none!important
 .messages{flex:1;overflow-y:auto;padding:30px 20px;scroll-behavior:smooth}
 .messages-interieur{width:100%;max-width:790px;margin:auto;display:flex;flex-direction:column;gap:22px;min-height:100%}
 .accueil-chat{margin:auto;width:100%;text-align:center;padding:25px 10px 45px}
-.symbole-accueil{width:68px;height:68px;margin:0 auto 25px;display:grid;place-items:center;border-radius:22px;background:var(--p);color:#159c8d;font-size:36px;font-weight:bold}
+.symbole-accueil{width:min(240px,70%);margin:0 auto 18px}
+.symbole-accueil img{width:100%;height:auto;display:block;mix-blend-mode:multiply}
 .accueil-chat h2{font-size:clamp(25px,4vw,34px);letter-spacing:-1px;margin-bottom:12px}
 .accueil-chat p{color:var(--s);font-size:15px}
 .bulle{max-width:85%;width:fit-content;padding:14px 17px;border-radius:18px;font-size:15px;line-height:1.7;overflow-wrap:anywhere}
 .bulle-user{align-self:flex-end;background:var(--p);border-bottom-right-radius:5px}
-.bulle-ia{align-self:flex-start;background:transparent;color:#253b40;padding-left:2px;max-width:100%}
+.bulle-ia{align-self:flex-start;background:transparent;color:var(--t);padding-left:2px;max-width:100%}
 .bulle-ia p{margin-bottom:10px}.bulle-ia ul,.bulle-ia ol{padding-left:23px;margin:10px 0}
 .bulle-ia h1,.bulle-ia h2,.bulle-ia h3{margin:12px 0}
 .etiquette-source{display:block;margin-top:12px;font-size:11px;color:var(--s)}
 .points{display:flex;gap:5px;padding:8px 0}
-.points span{width:7px;height:7px;background:#55cdbd;border-radius:50%;animation:rebond 1s infinite alternate}
+.points span{width:7px;height:7px;background:var(--g);border-radius:50%;animation:rebond 1s infinite alternate}
 .points span:nth-child(2){animation-delay:.2s}.points span:nth-child(3){animation-delay:.4s}
 @keyframes rebond{to{opacity:.3;transform:translateY(-5px)}}
 .alerte{padding:13px;border-radius:12px;font-size:13px}
 .alerte-erreur{background:#fff0f0;color:#b83232}
-.proposition{align-self:flex-start;max-width:90%;background:#f7fbfa;border:1px solid var(--b);padding:16px;border-radius:14px;font-size:14px;line-height:1.6}
+.proposition{align-self:flex-start;max-width:90%;background:#F8FAFF;border:1px solid var(--b);padding:16px;border-radius:14px;font-size:14px;line-height:1.6}
 .proposition .actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 .saisie{padding:12px 20px calc(18px + env(safe-area-inset-bottom));background:white}
-.saisie-interieur{max-width:790px;margin:auto;display:flex;align-items:flex-end;gap:10px;border:1px solid #dce8e8;border-radius:20px;padding:9px;box-shadow:0 4px 20px #073b460f}
-.saisie-interieur:focus-within{border-color:var(--g);box-shadow:0 4px 22px #63dccb26}
+.saisie-interieur{max-width:790px;margin:auto;display:flex;align-items:flex-end;gap:10px;border:1px solid var(--b);border-radius:20px;padding:9px;box-shadow:0 4px 20px rgba(38,52,91,.06);transition:border-color .3s,box-shadow .3s}
+.saisie-interieur:focus-within{border-color:var(--g);box-shadow:0 4px 22px var(--glow)}
 #champ{flex:1;min-width:0;max-height:160px;resize:none;border:0;outline:0;padding:11px 9px;font-size:16px;line-height:1.5;color:var(--t);background:transparent}
-#champ::placeholder{color:#5F7377}
+#champ::placeholder{color:#6B7690}
 #envoyer{min-width:44px;height:44px;border-radius:13px;font-size:17px}
 #envoyer:disabled{opacity:.5;cursor:not-allowed}
-.note-saisie{max-width:790px;margin:10px auto 0;text-align:center;color:#5F7377;font-size:11px;line-height:1.5}
+.note-saisie{max-width:790px;margin:10px auto 0;text-align:center;color:var(--s);font-size:11px;line-height:1.5}
 /* Photos : bouton, aperçus avant envoi, vignettes dans la bulle */
 #ajouter-photo{min-width:44px;height:44px;padding:0;border-radius:13px;font-size:18px}
 #ajouter-photo:disabled{opacity:.5;cursor:not-allowed}
 .apercus{max-width:790px;margin:0 auto 10px;display:flex;gap:8px;flex-wrap:wrap}
 .apercu{position:relative;width:72px;height:72px;padding:0;border:1px solid var(--b);border-radius:12px;overflow:hidden;background:#fff}
 .apercu img{width:100%;height:100%;object-fit:cover;display:block}
-.apercu span{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:#073B46d9;color:#fff;font-size:12px;display:grid;place-items:center}
+.apercu span{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:#26345Bd9;color:#fff;font-size:12px;display:grid;place-items:center}
 .bulle-photos{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .bulle-photos img{width:88px;height:88px;object-fit:cover;border-radius:12px;display:block}
 .voile{display:none}
@@ -83,17 +93,29 @@ button,textarea{font:inherit}button{cursor:pointer}.cache{display:none!important
 .messages{padding:20px 14px}.saisie{padding:10px 12px calc(14px + env(safe-area-inset-bottom))}
 .bulle{max-width:92%;font-size:14px}
 }
-@media(max-width:420px){.logo{font-size:18px}.tiroir{width:285px}.accueil-chat h2{font-size:26px}}
-/* ===== Animations (ajout) ===== */
-@keyframes apparition{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-@keyframes flottement{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-.accueil-chat{animation:apparition .6s ease backwards}
-.symbole-accueil{animation:flottement 3s ease-in-out infinite}
-.bulle,.alerte,.proposition{animation:apparition .3s ease backwards}
+@media(max-width:420px){.tiroir{width:285px}.accueil-chat h2{font-size:26px}}
+/* ===== ANIMATIONS ===== */
+@keyframes apparition{from{opacity:0;transform:translateY(26px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes depuis-droite{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
+@keyframes depuis-gauche{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:none}}
+@keyframes flottement{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-14px) rotate(1.5deg)}}
+/* Accueil : le logo apparaît puis flotte ; le titre et le texte suivent */
+.accueil-chat .symbole-accueil{animation:apparition .7s cubic-bezier(.2,.8,.2,1) backwards,flottement 3.5s ease-in-out .7s infinite}
+.accueil-chat h2{animation:apparition .7s cubic-bezier(.2,.8,.2,1) .15s backwards}
+.accueil-chat p{animation:apparition .7s cubic-bezier(.2,.8,.2,1) .3s backwards}
+/* Messages : l'utilisateur arrive par la droite, l'IA par la gauche */
+.bulle-user{animation:depuis-droite .45s cubic-bezier(.2,.8,.2,1) backwards}
+.bulle-ia{animation:depuis-gauche .45s cubic-bezier(.2,.8,.2,1) backwards}
+.alerte,.proposition{animation:apparition .45s cubic-bezier(.2,.8,.2,1) backwards}
+/* Effet au toucher (visible sur téléphone) */
+.bouton:not(:disabled):active{transform:scale(.94)}
+#envoyer:not(:disabled):active{transform:scale(.88)}
+.suppr:active{transform:scale(.9)}
 /* Effets au survol : seulement pour les appareils avec souris (pas de blocage sur téléphone) */
 @media(hover:hover){
-.bouton-principal:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 6px 15px rgba(0,0,0,.12)}
+.bouton-principal:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 6px 16px var(--glow)}
 #envoyer:not(:disabled):hover{transform:scale(1.08)}
+.logo:hover .logo-img{transform:rotate(-6deg) scale(1.08)}
 }
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -102,7 +124,7 @@ button,textarea{font:inherit}button{cursor:pointer}.cache{display:none!important
 <div class="app-chat" id="application" aria-busy="true">
 <aside class="tiroir" id="tiroir" aria-label="Historique des conversations">
 <div class="tiroir-tete">
-<a class="logo" href="index.html"><span class="logo-pastille">J</span> Jupiter IA</a>
+<a class="logo" href="index.html" aria-label="Seno IA, accueil"><img class="logo-img" src="Logo%20Seno%20IA.png" alt="Seno IA"></a>
 <button type="button" class="bouton bouton-secondaire" id="fermer-tiroir" aria-label="Fermer">✕</button>
 </div>
 <div style="padding:12px 12px 0">
@@ -136,7 +158,7 @@ button,textarea{font:inherit}button{cursor:pointer}.cache{display:none!important
 <textarea id="champ" rows="1" maxlength="2000" aria-label="Ton message" placeholder="Écris ton message…"></textarea>
 <button type="submit" class="bouton bouton-principal" id="envoyer" aria-label="Envoyer">↑</button>
 </form>
-<p class="note-saisie" id="note-saisie">Jupiter IA peut se tromper. Vérifie les informations importantes.</p>
+<p class="note-saisie" id="note-saisie">Seno IA peut se tromper. Vérifie les informations importantes.</p>
 </div>
 </main>
 </div>
@@ -195,7 +217,7 @@ if(texte){var t=document.createElement("div");t.textContent=texte;bulle.appendCh
 }
 else{
 bulle.innerHTML=JIA.formater(texte);
-var etiquette=source==="connaissance"?"Réponse issue de la base de connaissances de Jupiter IA":source==="internet"?"Réponse enrichie par une recherche Internet":null;
+var etiquette=source==="connaissance"?"Réponse issue de la base de connaissances de Seno IA":source==="internet"?"Réponse enrichie par une recherche Internet":null;
 if(etiquette){
 var span=document.createElement("span");
 span.className="etiquette-source";
@@ -209,7 +231,7 @@ interieur.appendChild(bulle);defiler();return bulle;
 function ajouterAttente(){
 var b=document.createElement("div");
 b.className="bulle bulle-ia";
-b.setAttribute("aria-label","Jupiter IA réfléchit");
+b.setAttribute("aria-label","Seno IA réfléchit");
 b.innerHTML='<span class="points"><span></span><span></span><span></span></span>';
 interieur.appendChild(b);defiler();return b;
 }
@@ -221,7 +243,7 @@ interieur.appendChild(z);defiler();
 }
 function majRestants(n){
 if(typeof n!=="number")return;
-note.textContent="Il te reste "+n+" message"+(n>1?"s":"")+" aujourd'hui. Jupiter IA peut se tromper : vérifie les informations importantes.";
+note.textContent="Il te reste "+n+" message"+(n>1?"s":"")+" aujourd'hui. Seno IA peut se tromper : vérifie les informations importantes.";
 }
 
 /* Photos : lecture, réduction et conversion d'une photo en JPEG (base64) */
@@ -301,7 +323,10 @@ function afficherAccueil(){
 var bloc=document.createElement("div");
 bloc.className="accueil-chat";bloc.id="accueil";
 var symbole=document.createElement("div");
-symbole.className="symbole-accueil";symbole.textContent="J";
+symbole.className="symbole-accueil";
+var logo=document.createElement("img");
+logo.src="Logo%20Seno%20IA.png";logo.alt="Seno IA";
+symbole.appendChild(logo);
 var prenom=((etat.utilisateur&&etat.utilisateur.name)||"").split(" ")[0];
 var titre=document.createElement("h2");
 titre.textContent=prenom?"Bonjour "+prenom+" !":"Bonjour !";
@@ -374,7 +399,7 @@ function afficherProposition(texte){
 var carte=document.createElement("div");
 carte.className="proposition";
 var question=document.createElement("p");
-question.textContent="Cette question demande une information récente. Veux-tu que Jupiter IA cherche sur Internet ?";
+question.textContent="Cette question demande une information récente. Veux-tu que Seno IA cherche sur Internet ?";
 var actions=document.createElement("div");actions.className="actions";
 var oui=document.createElement("button");
 oui.type="button";oui.className="bouton bouton-principal";oui.textContent="Oui, chercher";
@@ -460,7 +485,7 @@ $("application").removeAttribute("aria-busy");
 try{await chargerConversations()}
 catch(e){ajouterErreur("Impossible de charger l'historique : "+e.message)}
 }catch(e){
-ajouterErreur("Impossible de démarrer Jupiter IA : "+e.message);
+ajouterErreur("Impossible de démarrer Seno IA : "+e.message);
 }
 })();
 })();
