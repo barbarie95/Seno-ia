@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Administration – Seno IA</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#FFFFFF">
+  <link rel="icon" type="image/png" href="Logo%20Seno%20IA.png">
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    /* Réglages propres à la page d'administration */
+    .barre { height: 10px; background: var(--carte-2); border-radius: 999px; overflow: hidden; margin: 10px 0 6px; }
+    .barre span { display: block; height: 100%; width: 0; background: var(--degrade); border-radius: 999px; transition: width .6s ease; }
+    .barre.alerte-barre span { background: var(--danger); }
+    .rep { color: var(--discret); font-size: .9rem; margin: 6px 0; overflow-wrap: anywhere; }
+    .recherche { display: flex; gap: 8px; }
+    .recherche input { flex: 1; min-width: 0; }
+    .ligne-champs { display: grid; gap: 0 14px; grid-template-columns: 1fr; }
+    .pagination { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+    .rangee { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+    .exemple { background: var(--carte-2); border-radius: 12px; padding: 12px; overflow-x: auto; font-size: .82rem; margin-top: 8px; }
+    @media (min-width: 700px) { .ligne-champs { grid-template-columns: 1fr 1fr; } }
+  </style>
+</head>
+<body>
+
+  <!-- En-tête -->
+  <header class="entete">
+    <div class="conteneur">
+      <a class="logo" href="index.html" aria-label="Seno IA, accueil">
+        <img class="logo-img" src="Logo%20Seno%20IA.png" alt="Seno IA">
+      </a>
+      <nav aria-label="Navigation principale">
+        <a class="bouton bouton-principal bouton-petit" href="chat.html">Discussion</a>
+        <a class="bouton bouton-secondaire bouton-petit" href="compte.html">Mon compte</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page-simple" id="page" aria-busy="true">
+    <div class="conteneur" style="max-width:860px">
+      <h1 style="margin-bottom:6px">Administration</h1>
+      <p class="discret" style="margin-bottom:18px">Réservée à l'administrateur de Seno IA.</p>
+      <div id="msg-global" class="cache" aria-live="polite"></div>
+
+      <!-- Le contenu reste caché tant que le statut d'administrateur n'est pas confirmé -->
+      <div id="contenu-admin" class="cache">
+
+        <!-- Onglets -->
+        <div class="onglets-admin" role="tablist" aria-label="Sections de l'administration">
+          <button type="button" role="tab" id="onglet-tableau" aria-controls="panneau-tableau" aria-selected="true">📊 Tableau de bord</button>
+          <button type="button" role="tab" id="onglet-fiches" aria-controls="panneau-fiches" aria-selected="false">📚 Connaissances</button>
+          <button type="button" role="tab" id="onglet-limites" aria-controls="panneau-limites" aria-selected="false">⚙️ Limites</button>
+        </div>
+
+        <!-- ===== TABLEAU DE BORD ===== -->
+        <section id="panneau-tableau" role="tabpanel" aria-labelledby="onglet-tableau">
+          <div id="msg-tableau" class="cache" aria-live="polite"></div>
+          <div class="grille-stats">
+            <div class="stat"><strong id="st-utilisateurs">–</strong>Utilisateurs</div>
+            <div class="stat"><strong id="st-conversations">–</strong>Conversations</div>
+            <div class="stat"><strong id="st-messages">–</strong>Messages</div>
+            <div class="stat"><strong id="st-connaissances">–</strong>Fiches de connaissances</div>
+          </div>
+          <div class="carte">
+            <h3>Recherches Internet ce mois-ci</h3>
+            <p><strong id="st-recherches" style="font-size:1.4rem">–</strong></p>
+            <div class="barre" id="barre" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Part du plafond mensuel de recherches utilisée">
+              <span id="barre-remplie"></span>
+            </div>
+            <p class="discret" id="st-recherches-texte"></p>
+            <div id="alerte-recherches" class="alerte alerte-erreur cache" role="status" style="margin-top:12px;margin-bottom:0">
+              Attention : tu as utilisé plus de 80 % de ton plafond mensuel de recherches Internet.
+            </div>
+          </div>
+          <button id="actualiser" type="button" class="bouton bouton-secondaire">Actualiser les chiffres</button>
+        </section>
+
+        <!-- ===== CONNAISSANCES ===== -->
+        <section id="panneau-fiches" role="tabpanel" aria-labelledby="onglet-fiches" class="cache">
+          <div id="msg-fiches" class="cache" aria-live="polite"></div>
+
+          <div class="rangee">
+            <button id="nouvelle-fiche" type="button" class="bouton bouton-principal">+ Nouvelle fiche</button>
+          </div>
+
+          <!-- Formulaire d'ajout / de modification -->
+          <section id="carte-form" class="carte cache" aria-labelledby="titre-form" style="margin-bottom:18px">
+            <h2 id="titre-form">Nouvelle fiche</h2>
+            <div id="msg-form" class="cache" aria-live="polite"></div>
+            <form id="form-fiche" novalidate>
+              <div class="champ">
+                <label for="f-question">Question</label>
+                <input id="f-question" type="text" maxlength="500" required>
+              </div>
+              <div class="champ">
+                <label for="f-reponse">Réponse</label>
+                <textarea id="f-reponse" maxlength="4000" rows="6" required></textarea>
+              </div>
+              <div class="champ">
+                <label for="f-mots">Mots-clés (séparés par des virgules)</label>
+                <input id="f-mots" type="text" maxlength="500">
+              </div>
+              <div class="ligne-champs">
+                <div class="champ">
+                  <label for="f-categorie">Catégorie</label>
+                  <input id="f-categorie" type="text" maxlength="60" list="categories">
+                  <datalist id="categories">
+                    <option value="Pays"></option>
+                    <option value="Pratique"></option>
+                    <option value="Plateforme"></option>
+                    <option value="Espace"></option>
+                    <option value="Sport"></option>
+                    <option value="Seno IA"></option>
+                  </datalist>
+                </div>
+                <div class="champ">
+                  <label for="f-pays">Pays ou zone</label>
+                  <input id="f-pays" type="text" maxlength="60">
+                </div>
+              </div>
+              <div class="case">
+                <input id="f-exacte" type="checkbox">
+                <label for="f-exacte">Réponse exacte (renvoyée telle quelle, sans appeler Gemini)</label>
+              </div>
+              <div class="case">
+                <input id="f-actif" type="checkbox" checked>
+                <label for="f-actif">Fiche active</label>
+              </div>
+              <div class="rangee" style="margin-bottom:0">
+                <button id="f-enregistrer" type="submit" class="bouton bouton-principal">Enregistrer la fiche</button>
+                <button id="f-annuler" type="button" class="bouton bouton-secondaire">Annuler</button>
+              </div>
+            </form>
+          </section>
+
+          <!-- Recherche dans les fiches -->
+          <form id="form-recherche" class="champ" novalidate>
+            <label for="recherche">Rechercher une fiche (mot entier de la question, ex. Togo)</label>
+            <div class="recherche">
+              <input id="recherche" type="search" maxlength="100">
+              <button type="submit" class="bouton bouton-secondaire">Chercher</button>
+            </div>
+          </form>
+
+          <p id="resume-fiches" class="discret" aria-live="polite"></p>
+          <div id="liste-fiches" class="liste-admin"></div>
+          <div class="pagination">
+            <button id="page-precedente" type="button" class="bouton bouton-secondaire bouton-petit">← Précédentes</button>
+            <button id="page-suivante" type="button" class="bouton bouton-secondaire bouton-petit">Suivantes →</button>
+          </div>
+
+          <!-- Import en masse -->
+          <section class="carte" aria-labelledby="titre-import" style="margin-top:24px">
+            <h2 id="titre-import">Importer plusieurs fiches</h2>
+            <p class="discret" style="margin-bottom:10px">
+              Colle un tableau JSON de fiches. Les retours à la ligne dans une réponse s'écrivent \n.
+              L'import n'est pas comparé aux fiches déjà enregistrées : cherche d'abord pour éviter les doublons.
+            </p>
+            <details>
+              <summary class="discret">Voir un exemple</summary>
+<pre class="exemple">[
+  {
+    "question": "Donne-moi des informations sur le Gabon",
+    "reponse": "🇬🇦 **Gabon** : fiche rapide\n\n- 🏛️**Capitale** : Libreville",
+    "mots_cles": "Gabon, gabonais, Libreville",
+    "categorie": "Pays",
+    "pays": "Gabon",
+    "reponse_exacte": true,
+    "actif": true
+  }
+]</pre>
+            </details>
+            <div id="msg-import" class="cache" aria-live="polite" style="margin-top:12px"></div>
+            <div class="champ" style="margin-top:12px">
+              <label for="import-texte">Fiches à importer (JSON)</label>
+              <textarea id="import-texte" rows="8" spellcheck="false" style="font-family:monospace;font-size:.85rem"></textarea>
+            </div>
+            <div class="rangee" style="margin-bottom:0">
+              <button id="import-verifier" type="button" class="bouton bouton-secondaire">Vérifier</button>
+              <button id="import-lancer" type="button" class="bouton bouton-principal" disabled>Importer</button>
+            </div>
+          </section>
+        </section>
+
+        <!-- ===== LIMITES ===== -->
+        <section id="panneau-limites" role="tabpanel" aria-labelledby="onglet-limites" class="cache">
+          <div class="carte">
+            <h2>Limites d'utilisation</h2>
+            <div id="msg-limites" class="cache" aria-live="polite"></div>
+            <form id="form-limites" novalidate>
+              <div class="champ">
+                <label for="l-messages">Messages par jour et par utilisateur (1 à 1000)</label>
+                <input id="l-messages" type="number" inputmode="numeric" min="1" max="1000" required>
+                <p class="discret" style="margin-top:6px">Les réponses issues de la base de connaissances ne sont pas comptées.</p>
+              </div>
+              <div class="champ">
+                <label for="l-recherches">Recherches Internet par mois, pour tout le site (0 à 100000)</label>
+                <input id="l-recherches" type="number" inputmode="numeric" min="0" max="100000" required>
+                <p class="discret" style="margin-top:6px">Chaque recherche utilise 1 crédit Tavily : vérifie ton offre Tavily avant d'augmenter ce plafond.</p>
+              </div>
+              <button id="l-enregistrer" type="submit" class="bouton bouton-principal">Enregistrer les limites</button>
+            </form>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- SDK Appwrite (version fixe) puis fonctions communes de Seno IA -->
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@18.2.0"></script>
+  <script src="assets/app.js"></script>
+    <script>
+    (function () {
+      "use strict";
+
+      /* ---------- Petits outils ---------- */
+      var $ = function (id) { return document.getElementById(id); };
+      var nombre = function (n) { return Number(n || 0).toLocaleString("fr-FR"); };
+      // Crée un élément ; le texte est toujours inséré en texte brut (jamais en HTML)
+      function el(balise, classe, texte) {
+        var e = document.createElement(balise);
+        if (classe) e.className = classe;
+        if (texte !== undefined && texte !== null) e.textContent = texte;
+        return e;
+      }
+      function coupe(texte, max) { texte = String(texte || ""); return texte.length > max ? texte.slice(0, max) + "…" : texte; }
+      function normaliser(t) {
+        return String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+          .replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+      }
+
+      /* ---------- Onglets ---------- */
+      var NOMS = ["tableau", "fiches", "limites"];
+      var charge = { fiches: false };
+      function afficherOnglet(nom) {
+        NOMS.forEach(function (n) {
+          var actif = n === nom;
+          $("onglet-" + n).setAttribute("aria-selected", actif ? "true" : "false");
+          $("panneau-" + n).classList.toggle("cache", !actif);
+        });
+        if (nom === "tableau") chargerStats();
+        if (nom === "fiches" && !charge.fiches) { charge.fiches = true; chargerFiches(); }
+        if (nom === "limites") chargerLimites();
+      }
+      NOMS.forEach(function (n) {
+        $("onglet-" + n).addEventListener("click", function () { afficherOnglet(n); });
+      });
+
+      /* ---------- Tableau de bord ---------- */
+      async function chargerStats() {
+        var zone = $("msg-tableau");
+        JIA.message(zone, "");
+        try {
+          var s = await JIA.appeler("admin_stats");
+          $("st-utilisateurs").textContent = nombre(s.utilisateurs);
+          $("st-conversations").textContent = nombre(s.conversations);
+          $("st-messages").textContent = nombre(s.messages);
+          $("st-connaissances").textContent = nombre(s.connaissances);
+          var utilisees = Number(s.recherches_mois) || 0;
+          var plafond = Number(s.limite_recherches_mois) || 0;
+          var pct = plafond > 0 ? Math.min(100, Math.round(utilisees * 100 / plafond)) : 100;
+          $("st-recherches").textContent = nombre(utilisees) + " / " + nombre(plafond);
+          $("barre-remplie").style.width = pct + "%";
+          $("barre").setAttribute("aria-valuenow", String(pct));
+          $("barre").classList.toggle("alerte-barre", pct >= 80);
+          $("alerte-recherches").classList.toggle("cache", pct < 80);
+          $("st-recherches-texte").textContent = pct + " % du plafond mensuel utilisé.";
+        } catch (erreur) {
+          JIA.message(zone, erreur.message);
+        }
+      }
+      $("actualiser").addEventListener("click", chargerStats);
+
+      /* ---------- Connaissances : liste ---------- */
+      var PAGE = 50;
+      var etat = { decalage: 0, total: 0, recherche: "", edition: null };
+
+      function pastille(parent, texte) { parent.appendChild(el("span", "pastille", texte)); }
+
+      function carteFiche(f) {
+        var e = el("article", "entree");
+        var titre = el("p");
+        titre.appendChild(el("strong", null, f.question));
+        e.appendChild(titre);
+
+        var infos = el("p");
+        pastille(infos, f.categorie || "Sans catégorie");
+        if (f.pays) pastille(infos, f.pays);
+        pastille(infos, f.actif ? "Active" : "Inactive");
+        if (f.reponse_exacte) pastille(infos, "Réponse exacte");
+        e.appendChild(infos);
+
+        e.appendChild(el("p", "rep", coupe(f.reponse, 160)));
+
+        var actions = el("div", "actions");
+        var modifierBtn = el("button", "bouton bouton-secondaire bouton-petit", "Modifier");
+        modifierBtn.type = "button";
+        modifierBtn.addEventListener("click", function () { ouvrirFormulaire(f); });
+
+        var basculer = el("button", "bouton bouton-secondaire bouton-petit", f.actif ? "Désactiver" : "Activer");
+        basculer.type = "button";
+        basculer.addEventListener("click", async function () {
+          JIA.occupe(basculer, true, "…");
+          try {
+            await JIA.appeler("admin_connaissances_update", {
+              id: f.id, question: f.question, reponse: f.reponse, mots_cles: f.mots_cles || "",
+              categorie: f.categorie || "", pays: f.pays || "", reponse_exacte: !!f.reponse_exacte, actif: !f.actif
+            });
+            await chargerFiches();
+          } catch (erreur) {
+            JIA.message($("msg-fiches"), erreur.message);
+            JIA.occupe(basculer, false);
+          }
+        });
+
+        var supprimerBtn = el("button", "bouton bouton-danger bouton-petit", "Supprimer");
+        supprimerBtn.type = "button";
+        supprimerBtn.addEventListener("click", async function () {
+          if (!confirm("Supprimer cette fiche ? Cette action est définitive.")) return;
+          JIA.occupe(supprimerBtn, true, "…");
+          try {
+            await JIA.appeler("admin_connaissances_delete", { id: f.id });
+            await chargerFiches();
+            JIA.message($("msg-fiches"), "Fiche supprimée.", "ok");
+          } catch (erreur) {
+            JIA.message($("msg-fiches"), erreur.message);
+            JIA.occupe(supprimerBtn, false);
+          }
+        });
+
+        actions.appendChild(modifierBtn);
+        actions.appendChild(basculer);
+        actions.appendChild(supprimerBtn);
+        e.appendChild(actions);
+        return e;
+      }
+
+      async function chargerFiches() {
+        var zone = $("msg-fiches");
+        JIA.message(zone, "");
+        try {
+          var r = await JIA.appeler("admin_connaissances_list", { decalage: etat.decalage, recherche: etat.recherche });
+          etat.total = r.total || 0;
+          var liste = $("liste-fiches");
+          liste.textContent = "";
+          (r.entrees || []).forEach(function (f) { liste.appendChild(carteFiche(f)); });
+          var nb = (r.entrees || []).length;
+          $("resume-fiches").textContent = nb
+            ? "Fiches " + (etat.decalage + 1) + " à " + (etat.decalage + nb) + " sur " + nombre(etat.total)
+            : "Aucune fiche trouvée.";
+          $("page-precedente").disabled = etat.decalage === 0;
+          $("page-suivante").disabled = etat.decalage + PAGE >= etat.total;
+        } catch (erreur) {
+          JIA.message(zone, erreur.message);
+        }
+      }
+
+      $("form-recherche").addEventListener("submit", function (e) {
+        e.preventDefault();
+        etat.recherche = $("recherche").value.trim();
+        etat.decalage = 0;
+        chargerFiches();
+      });
+      $("page-precedente").addEventListener("click", function () {
+        etat.decalage = Math.max(0, etat.decalage - PAGE);
+        chargerFiches();
+      });
+      $("page-suivante").addEventListener("click", function () {
+        etat.decalage += PAGE;
+        chargerFiches();
+      });
+
+      /* ---------- Connaissances : formulaire ---------- */
+      function ouvrirFormulaire(f) {
+        etat.edition = f ? f.id : null;
+        $("titre-form").textContent = f ? "Modifier la fiche" : "Nouvelle fiche";
+        $("f-question").value = f ? (f.question || "") : "";
+        $("f-reponse").value = f ? (f.reponse || "") : "";
+        $("f-mots").value = f ? (f.mots_cles || "") : "";
+        $("f-categorie").value = f ? (f.categorie || "") : "";
+        $("f-pays").value = f ? (f.pays || "") : "";
+        $("f-exacte").checked = f ? !!f.reponse_exacte : false;
+        $("f-actif").checked = f ? !!f.actif : true;
+        JIA.message($("msg-form"), "");
+        $("carte-form").classList.remove("cache");
+        $("carte-form").scrollIntoView({ behavior: "smooth", block: "start" });
+        $("f-question").focus();
+      }
+      function fermerFormulaire() {
+        etat.edition = null;
+        $("form-fiche").reset();
+        $("f-actif").checked = true;
+        $("carte-form").classList.add("cache");
+      }
+      $("nouvelle-fiche").addEventListener("click", function () { ouvrirFormulaire(null); });
+      $("f-annuler").addEventListener("click", fermerFormulaire);
+
+      $("form-fiche").addEventListener("submit", async function (e) {
+        e.preventDefault();
+        var zone = $("msg-form");
+        var bouton = $("f-enregistrer");
+        var donnees = {
+          question: $("f-question").value.trim(),
+          reponse: $("f-reponse").value.trim(),
+          mots_cles: $("f-mots").value.trim(),
+          categorie: $("f-categorie").value.trim(),
+          pays: $("f-pays").value.trim(),
+          reponse_exacte: $("f-exacte").checked,
+          actif: $("f-actif").checked
+        };
+        if (!donnees.question || !donnees.reponse) return JIA.message(zone, "La question et la réponse sont obligatoires.");
+        JIA.message(zone, "");
+        JIA.occupe(bouton, true, "Enregistrement…");
+        var modification = !!etat.edition;
+        try {
+          if (modification) {
+            donnees.id = etat.edition;
+            await JIA.appeler("admin_connaissances_update", donnees);
+          } else {
+            await JIA.appeler("admin_connaissances_add", donnees);
+          }
+          fermerFormulaire();
+          await chargerFiches();
+          JIA.message($("msg-fiches"), modification ? "Fiche modifiée." : "Fiche ajoutée.", "ok");
+        } catch (erreur) {
+          JIA.message(zone, erreur.message);
+        }
+        JIA.occupe(bouton, false);
+      });
+
+      /* ---------- Connaissances : import en masse ---------- */
+      var lot = [];  // fiches vérifiées, prêtes à être importées
+
+      function reinitialiserLot() { lot = []; $("import-lancer").disabled = true; }
+      $("import-texte").addEventListener("input", reinitialiserLot);
+
+      $("import-verifier").addEventListener("click", function () {
+        var zone = $("msg-import");
+        reinitialiserLot();
+        var texte = $("import-texte").value.trim();
+        if (!texte) return JIA.message(zone, "Colle d'abord tes fiches.");
+        var donnees;
+        try { donnees = JSON.parse(texte); }
+        catch (erreur) { return JIA.message(zone, "Ce texte n'est pas du JSON valide : " + erreur.message); }
+        if (!Array.isArray(donnees)) donnees = [donnees];
+
+        var problemes = [], vus = {};
+        donnees.forEach(function (item, i) {
+          var num = i + 1;
+          if (!item || typeof item !== "object") return problemes.push("Fiche " + num + " : format invalide.");
+          var question = String(item.question || "").trim();
+          var reponse = String(item.reponse || "").trim();
+          if (!question || !reponse) return problemes.push("Fiche " + num + " : question ou réponse vide.");
+          if (question.length > 500) return problemes.push("Fiche " + num + " : question trop longue (500 maximum).");
+          if (reponse.length > 4000) return problemes.push("Fiche " + num + " : réponse trop longue (4000 maximum).");
+          var cle = normaliser(question);
+          if (vus[cle]) return problemes.push("Fiche " + num + " : doublon dans ton lot (« " + coupe(question, 40) + " »).");
+          vus[cle] = true;
+          lot.push(item);
+        });
+
+        var message = lot.length + " fiche(s) valide(s) sur " + donnees.length + ".";
+        if (problemes.length) message += " Problèmes : " + problemes.slice(0, 8).join(" ");
+        if (lot.length) {
+          $("import-lancer").disabled = false;
+          $("import-lancer").textContent = "Importer " + lot.length + " fiche(s)";
+          JIA.message(zone, message, "ok");
+        } else {
+          JIA.message(zone, message);
+        }
+      });
+
+      $("import-lancer").addEventListener("click", async function () {
+        var zone = $("msg-import");
+        var bouton = $("import-lancer");
+        if (!lot.length) return;
+        JIA.occupe(bouton, true, "Import en cours…");
+        var importees = 0, erreurs = [];
+        try {
+          for (var i = 0; i < lot.length; i += 50) {  // le serveur accepte 50 fiches par envoi
+            var r = await JIA.appeler("admin_connaissances_import", { items: lot.slice(i, i + 50) });
+            importees += r.importees || 0;
+            (r.erreurs || []).forEach(function (m) { erreurs.push(m); });
+          }
+          var message = importees + " fiche(s) importée(s).";
+          if (erreurs.length) message += " Erreurs : " + erreurs.slice(0, 8).join(" ");
+          JIA.message(zone, message, erreurs.length ? undefined : "ok");
+          if (importees) { $("import-texte").value = ""; etat.decalage = 0; etat.recherche = ""; $("recherche").value = ""; chargerFiches(); }
+        } catch (erreur) {
+          JIA.message(zone, "Import interrompu après " + importees + " fiche(s) : " + erreur.message);
+        }
+        JIA.occupe(bouton, false);
+        reinitialiserLot();
+        bouton.textContent = "Importer";
+      });
+
+      /* ---------- Limites ---------- */
+      async function chargerLimites() {
+        var zone = $("msg-limites");
+        JIA.message(zone, "");
+        try {
+          var r = await JIA.appeler("admin_reglages_get");
+          $("l-messages").value = r.limite_messages_jour;
+          $("l-recherches").value = r.limite_recherches_mois;
+        } catch (erreur) {
+          JIA.message(zone, erreur.message);
+        }
+      }
+      $("form-limites").addEventListener("submit", async function (e) {
+        e.preventDefault();
+        var zone = $("msg-limites");
+        var bouton = $("l-enregistrer");
+        var messages = parseInt($("l-messages").value, 10);
+        var recherches = parseInt($("l-recherches").value, 10);
+        if (isNaN(messages) || messages < 1 || messages > 1000) return JIA.message(zone, "Les messages par jour doivent être compris entre 1 et 1000.");
+        if (isNaN(recherches) || recherches < 0 || recherches > 100000) return JIA.message(zone, "Les recherches par mois doivent être comprises entre 0 et 100000.");
+        JIA.message(zone, "");
+        JIA.occupe(bouton, true, "Enregistrement…");
+        try {
+          await JIA.appeler("admin_reglages_set", { cle: "limite_messages_jour", valeur: messages });
+          await JIA.appeler("admin_reglages_set", { cle: "limite_recherches_mois", valeur: recherches });
+          JIA.message(zone, "Les limites ont été enregistrées.", "ok");
+        } catch (erreur) {
+          JIA.message(zone, erreur.message);
+        }
+        JIA.occupe(bouton, false);
+      });
+
+      /* ---------- Démarrage : accès réservé à l'administrateur ---------- */
+      (async function () {
+        try {
+          var utilisateur = await JIA.exigerConnexion();
+          if (!utilisateur) return;  // redirigé vers la connexion
+          if (!JIA.estAdmin(utilisateur)) { window.location.replace("chat.html"); return; }
+          $("page").removeAttribute("aria-busy");
+          $("contenu-admin").classList.remove("cache");
+          chargerStats();
+        } catch (erreur) {
+          JIA.message($("msg-global"), "Impossible de démarrer l'administration : " + erreur.message);
+        }
+      })();
+    })();
+  </script>
+</body>
+</html>
