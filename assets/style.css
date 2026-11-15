@@ -1,24 +1,26 @@
 /* ==========================================================================
-   JUPITER IA - Feuille de style commune (thème clair : fond blanc, turquoise)
+   SENO IA - Feuille de style commune (thème clair : fond blanc, bleu et violet)
    Mobile d'abord, adaptée à la tablette et à l'ordinateur.
    Toutes les couleurs sont dans les variables ci-dessous.
    ========================================================================== */
 :root {
   color-scheme: light;
   --fond: #FFFFFF;
-  --carte: #F3FBFA;
-  --carte-2: #E4F7F4;
-  --bord: #D6ECE8;
-  --bord-champ: #A9CFC9;
-  --accent: #63DCCB;        /* turquoise clair des boutons */
-  --accent-2: #42CBB9;      /* turquoise un peu plus foncé (survol) */
-  --sur-accent: #073B46;    /* texte posé sur le turquoise */
-  --lien: #0B7A6E;          /* turquoise foncé pour les liens et titres */
-  --texte: #073B46;
-  --discret: #4F6B70;
+  --carte: #F8FAFF;
+  --carte-2: #ECF1FF;
+  --bord: #E6EAF5;
+  --bord-champ: #8F9DC6;
+  --accent: #4A62D8;        /* bleu-violet des éléments sélectionnés */
+  --accent-2: #3B52C4;      /* version un peu plus foncée (survol) */
+  --degrade: linear-gradient(135deg, #2370CC, #6D4FE0); /* boutons principaux */
+  --sur-accent: #FFFFFF;    /* texte posé sur l'accent et le dégradé */
+  --lien: #4B3FC4;          /* violet foncé pour les liens et titres */
+  --texte: #26345B;         /* bleu marine */
+  --discret: #5B6785;
   --danger: #C62828;
+  --glow: rgba(136, 103, 232, .22);
   --rayon: 14px;
-  --ombre: 0 8px 24px rgba(7, 59, 70, .10);
+  --ombre: 0 8px 24px rgba(38, 52, 91, .10);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -59,9 +61,11 @@ h3 { font-size: 1.05rem; margin-bottom: 8px; }
 .entete .conteneur { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; min-height: 64px; padding-top: 6px; padding-bottom: 6px; }
 .logo { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; color: var(--texte); text-decoration: none; white-space: nowrap; }
 .logo-pastille {
-  width: 34px; height: 34px; border-radius: 10px; background: var(--accent); color: var(--sur-accent);
+  width: 34px; height: 34px; border-radius: 10px; background: var(--degrade); color: #FFFFFF;
   display: grid; place-items: center; font-weight: 800;
 }
+/* Logo image (il contient déjà le texte « Seno IA ») */
+.logo-img { height: 44px; width: auto; display: block; mix-blend-mode: multiply; }
 .entete nav { display: flex; align-items: center; gap: 8px; }
 .entete .bouton { white-space: nowrap; min-height: 44px; padding: 6px 12px; font-size: .9rem; }
 
@@ -70,12 +74,12 @@ h3 { font-size: 1.05rem; margin-bottom: 8px; }
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 44px; padding: 10px 18px; border-radius: 12px; border: 1px solid transparent;
   font: inherit; font-weight: 600; cursor: pointer; text-decoration: none;
-  transition: background .2s, transform .1s;
+  transition: background .2s, transform .15s, filter .2s, box-shadow .2s;
 }
-.bouton:active { transform: scale(.98); }
+.bouton:active { transform: scale(.94); }
 .bouton[disabled] { opacity: .6; cursor: not-allowed; }
-.bouton-principal { background: var(--accent); color: var(--sur-accent); border-color: var(--accent); }
-.bouton-principal:hover { background: var(--accent-2); border-color: var(--accent-2); }
+.bouton-principal { background: var(--degrade); color: var(--sur-accent); border-color: transparent; }
+.bouton-principal:hover { filter: brightness(1.1); }
 .bouton-secondaire { background: #FFFFFF; color: var(--texte); border-color: var(--bord-champ); }
 .bouton-secondaire:hover { background: var(--carte-2); }
 .bouton-danger { background: #FFFFFF; color: var(--danger); border-color: var(--danger); }
@@ -89,9 +93,10 @@ h3 { font-size: 1.05rem; margin-bottom: 8px; }
 .champ input, .champ select, .champ textarea {
   width: 100%; min-height: 46px; padding: 10px 12px; border-radius: 12px;
   background: #FFFFFF; color: var(--texte); border: 1px solid var(--bord-champ); font: inherit;
+  transition: border-color .2s, box-shadow .2s;
 }
 .champ textarea { min-height: 90px; resize: vertical; }
-.champ input:focus, .champ select:focus, .champ textarea:focus { border-color: var(--lien); }
+.champ input:focus, .champ select:focus, .champ textarea:focus { border-color: var(--lien); box-shadow: 0 0 0 3px var(--glow); }
 .case { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .case input { width: 20px; height: 20px; accent-color: var(--lien); }
 
@@ -114,7 +119,7 @@ h3 { font-size: 1.05rem; margin-bottom: 8px; }
 .onglets { display: flex; gap: 6px; background: var(--carte-2); padding: 5px; border-radius: 12px; margin-bottom: 18px; }
 .onglets button {
   flex: 1; min-height: 42px; border: 0; border-radius: 9px; background: transparent;
-  color: var(--discret); font: inherit; font-weight: 600; cursor: pointer;
+  color: var(--discret); font: inherit; font-weight: 600; cursor: pointer; transition: background .2s, color .2s;
 }
 .onglets button[aria-selected="true"] { background: var(--accent); color: var(--sur-accent); }
 
@@ -126,7 +131,7 @@ h3 { font-size: 1.05rem; margin-bottom: 8px; }
   transform: translateX(-100%); transition: transform .25s;
 }
 .tiroir.ouvert { transform: none; }
-.voile { position: fixed; inset: 0; background: rgba(7, 40, 50, .45); z-index: 30; }
+.voile { position: fixed; inset: 0; background: rgba(20, 28, 60, .45); z-index: 30; }
 .tiroir-tete { padding: 14px; border-bottom: 1px solid var(--bord); display: flex; gap: 8px; align-items: center; justify-content: space-between; }
 .liste-conv { flex: 1; overflow-y: auto; padding: 10px; }
 .conv {
@@ -153,7 +158,7 @@ h3 { font-size: 1.05rem; margin-bottom: 8px; }
 .bulle p { margin-bottom: 8px; }
 .bulle p:last-child { margin-bottom: 0; }
 .bulle ul { margin: 0 0 8px 20px; }
-.bulle code { background: rgba(7, 59, 70, .10); padding: 1px 6px; border-radius: 6px; }
+.bulle code { background: rgba(38, 52, 91, .10); padding: 1px 6px; border-radius: 6px; }
 .bulle-user { align-self: flex-end; background: var(--accent); color: var(--sur-accent); border-bottom-right-radius: 5px; }
 .bulle-user a { color: var(--sur-accent); }
 .bulle-ia { align-self: flex-start; background: var(--carte); border: 1px solid var(--bord); border-bottom-left-radius: 5px; }
@@ -200,6 +205,23 @@ h3 { font-size: 1.05rem; margin-bottom: 8px; }
 .entree .actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .pastille { display: inline-block; font-size: .75rem; padding: 2px 8px; border-radius: 999px; background: var(--carte-2); color: var(--discret); margin-right: 4px; }
 
+/* ---------- Animations (ajout) ---------- */
+@keyframes apparition {
+  from { opacity: 0; transform: translateY(26px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+/* Les cartes (connexion, compte, administration) apparaissent en douceur */
+.auth .carte, .page-simple .carte { animation: apparition .6s cubic-bezier(.2, .8, .2, 1) backwards; }
+.page-simple .carte:nth-of-type(2) { animation-delay: .1s; }
+.page-simple .carte:nth-of-type(3) { animation-delay: .2s; }
+.grille-stats .stat, .liste-admin .entree { animation: apparition .45s cubic-bezier(.2, .8, .2, 1) backwards; }
+/* Effets au survol : seulement pour les appareils avec souris (pas de blocage sur téléphone) */
+@media (hover: hover) {
+  .bouton-principal:not([disabled]):hover { transform: translateY(-2px); box-shadow: 0 6px 16px var(--glow); }
+  .logo:hover .logo-img { transform: rotate(-6deg) scale(1.08); }
+}
+.logo-img { transition: transform .3s; }
+
 /* ---------- Tablette et ordinateur ---------- */
 @media (min-width: 700px) {
   h1 { font-size: 2.6rem; }
@@ -210,4 +232,4 @@ h3 { font-size: 1.05rem; margin-bottom: 8px; }
 @media (min-width: 960px) {
   .tiroir { position: static; transform: none; width: 300px; flex: 0 0 300px; }
   .voile, .bouton-menu { display: none !important; }
-   }
+          }
