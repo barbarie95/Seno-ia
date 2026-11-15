@@ -84,6 +84,17 @@ button,textarea{font:inherit}button{cursor:pointer}.cache{display:none!important
 .bulle{max-width:92%;font-size:14px}
 }
 @media(max-width:420px){.logo{font-size:18px}.tiroir{width:285px}.accueil-chat h2{font-size:26px}}
+/* ===== Animations (ajout) ===== */
+@keyframes apparition{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes flottement{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.accueil-chat{animation:apparition .6s ease backwards}
+.symbole-accueil{animation:flottement 3s ease-in-out infinite}
+.bulle,.alerte,.proposition{animation:apparition .3s ease backwards}
+/* Effets au survol : seulement pour les appareils avec souris (pas de blocage sur téléphone) */
+@media(hover:hover){
+.bouton-principal:not(:disabled):hover{transform:translateY(-2px);box-shadow:0 6px 15px rgba(0,0,0,.12)}
+#envoyer:not(:disabled):hover{transform:scale(1.08)}
+}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
