@@ -3,27 +3,31 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Jupiter IA – Ton assistant intelligent pensé pour l'Afrique</title>
-  <meta name="description" content="Jupiter IA répond à tes questions en français, avec des exemples adaptés au FCFA, au Mobile Money et aux réalités africaines. Crée ton compte gratuitement.">
+  <title>Seno IA – Ton assistant intelligent pensé pour l'Afrique</title>
+  <meta name="description" content="Seno IA répond à tes questions en français, avec des exemples adaptés au FCFA, au Mobile Money et aux réalités africaines. Crée ton compte gratuitement.">
   <meta name="theme-color" content="#FFFFFF">
-  <link rel="canonical" href="https://barbarie95.github.io/jupiter-ia/">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2363DCCB'/%3E%3Ctext x='32' y='46' font-size='40' font-weight='700' text-anchor='middle' fill='%23073B46' font-family='Arial'%3EJ%3C/text%3E%3C/svg%3E">
+  <link rel="canonical" href="https://barbarie95.github.io/Seno-ia/">
+  <link rel="icon" type="image/png" href="Logo%20Seno%20IA.png">
 
   <!-- Partage sur les réseaux sociaux -->
   <meta property="og:type" content="website">
   <meta property="og:locale" content="fr_FR">
-  <meta property="og:site_name" content="Jupiter IA">
-  <meta property="og:title" content="Jupiter IA – Ton assistant intelligent pensé pour l'Afrique">
+  <meta property="og:site_name" content="Seno IA">
+  <meta property="og:title" content="Seno IA – Ton assistant intelligent pensé pour l'Afrique">
   <meta property="og:description" content="Pose tes questions en français et obtiens des réponses adaptées aux réalités africaines.">
-  <meta property="og:url" content="https://barbarie95.github.io/jupiter-ia/">
+  <meta property="og:url" content="https://barbarie95.github.io/Seno-ia/">
+  <meta property="og:image" content="https://barbarie95.github.io/Seno-ia/Logo%20Seno%20IA.png">
+  <meta property="og:image:alt" content="Logo de Seno IA : un petit robot devant la carte de l'Afrique">
+  <meta name="twitter:card" content="summary_large_image">
 
   <!-- Données structurées pour les moteurs de recherche -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "WebApplication",
-    "name": "Jupiter IA",
-    "url": "https://barbarie95.github.io/jupiter-ia/",
+    "name": "Seno IA",
+    "url": "https://barbarie95.github.io/Seno-ia/",
+    "image": "https://barbarie95.github.io/Seno-ia/Logo%20Seno%20IA.png",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "Tous (navigateur web)",
     "inLanguage": "fr",
@@ -47,17 +51,24 @@
     }
     .contenu { width: 100%; max-width: 700px; }
 
+    /* Logo de l'en-tête (le logo contient déjà le texte « Seno IA ») */
+    .logo-img {
+      height: 44px;
+      width: auto;
+      display: block;
+      mix-blend-mode: multiply; /* fait disparaître le fond blanc de l'image */
+    }
+
+    /* Logo de l'accueil */
     .symbole {
-      width: 72px;
-      height: 72px;
-      margin: 0 auto 28px;
-      border-radius: 24px;
-      display: grid;
-      place-items: center;
-      background: var(--carte-2);
-      color: var(--lien);
-      font-size: 39px;
-      font-weight: 700;
+      width: min(260px, 72%);
+      margin: 0 auto 22px;
+    }
+    .symbole img {
+      width: 100%;
+      height: auto;
+      display: block;
+      mix-blend-mode: multiply;
     }
 
     h1 {
@@ -79,6 +90,29 @@
     }
     .bouton-principal:hover { transform: translateY(-2px); }
 
+    /* ===== Animations ===== */
+    @keyframes apparition {
+      from { opacity: 0; transform: translateY(26px) scale(.97); }
+      to   { opacity: 1; transform: none; }
+    }
+    @keyframes flottement {
+      0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+      50%      { transform: translateY(-14px) rotate(1.5deg); }
+    }
+    /* Le logo apparaît puis flotte ; le reste suit l'un après l'autre */
+    .symbole    { animation: apparition .7s cubic-bezier(.2,.8,.2,1) backwards,
+                             flottement 3.5s ease-in-out .7s infinite; }
+    h1          { animation: apparition .7s cubic-bezier(.2,.8,.2,1) .15s backwards; }
+    .bienvenue  { animation: apparition .7s cubic-bezier(.2,.8,.2,1) .3s backwards; }
+    .sous-titre { animation: apparition .7s cubic-bezier(.2,.8,.2,1) .45s backwards; }
+    .action     { animation: apparition .7s cubic-bezier(.2,.8,.2,1) .6s backwards; }
+    /* Effet au toucher (visible sur téléphone) */
+    .bouton:not(:disabled):active { transform: scale(.94); }
+    /* Respect des personnes qui demandent moins d'animations */
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+    }
+
     @media (max-width: 500px) {
       .accueil { padding-top: 40px; }
     }
@@ -89,9 +123,8 @@
 
   <header class="entete">
     <div class="conteneur">
-      <a class="logo" href="index.html" aria-label="Jupiter IA, accueil">
-        <span class="logo-pastille" aria-hidden="true">J</span>
-        Jupiter IA
+      <a class="logo" href="index.html" aria-label="Seno IA, accueil">
+        <img class="logo-img" src="Logo%20Seno%20IA.png" alt="Seno IA">
       </a>
 
       <nav aria-label="Navigation principale">
@@ -104,11 +137,13 @@
   <main class="accueil" id="contenu">
     <section class="contenu" aria-labelledby="titre-accueil">
 
-      <div class="symbole" aria-hidden="true">J</div>
+      <div class="symbole">
+        <img src="Logo%20Seno%20IA.png" alt="Seno IA, ton assistant intelligent">
+      </div>
 
       <h1 id="titre-accueil">Que veux-tu faire aujourd'hui ?</h1>
 
-      <p class="bienvenue">Bienvenue sur Jupiter IA</p>
+      <p class="bienvenue">Bienvenue sur Seno IA</p>
       <p class="discret sous-titre">
         Pose tes questions en français et obtiens des réponses adaptées au FCFA, au Mobile Money et aux réalités africaines.
       </p>
@@ -121,7 +156,7 @@
   </main>
 
   <footer class="pied">
-    © Jupiter IA
+    © Seno IA
   </footer>
 
   <!-- Si la personne est déjà connectée, on adapte les boutons (sans bloquer l'affichage) -->
@@ -148,4 +183,4 @@
   </script>
 
 </body>
-      </html>
+</html>
