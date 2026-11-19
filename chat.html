@@ -83,6 +83,21 @@ button,textarea{font:inherit}button{cursor:pointer}.cache{display:none!important
 .apercu span{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:#26345Bd9;color:#fff;font-size:12px;display:grid;place-items:center}
 .bulle-photos{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .bulle-photos img{width:88px;height:88px;object-fit:cover;border-radius:12px;display:block}
+/* Voix : bouton d'enregistrement (icônes dessinées), ses états, et bouton « Écouter » sous les réponses */
+#micro{min-width:44px;height:44px;padding:0;border-radius:13px}
+#micro:disabled{opacity:.7;cursor:wait}
+#micro .ic{display:none}
+#micro .ic-micro{display:block}
+#micro.ecoute{background:#FDECEC;border-color:#C62828;color:#B83232;animation:pulsation 1.2s ease-in-out infinite}
+#micro.ecoute .ic-micro{display:none}
+#micro.ecoute .ic-stop{display:block}
+#micro.traite .ic-micro{display:none}
+#micro.traite .ic-attente{display:block}
+.ic-attente{width:20px;height:20px;border:3px solid var(--b);border-top-color:var(--g);border-radius:50%;animation:rotation .8s linear infinite}
+@keyframes rotation{to{transform:rotate(360deg)}}
+@keyframes pulsation{0%,100%{box-shadow:0 0 0 0 rgba(198,40,40,.35)}50%{box-shadow:0 0 0 8px rgba(198,40,40,0)}}
+.actions-bulle{display:flex;gap:8px;margin-top:10px}
+.ecouter{min-height:36px;padding:6px 12px;font-size:12px}
 .voile{display:none}
 @media(min-width:960px){#bouton-menu,#fermer-tiroir{display:none}}
 @media(max-width:959px){
@@ -155,6 +170,12 @@ button,textarea{font:inherit}button{cursor:pointer}.cache{display:none!important
 <!-- Photos : bouton et champ fichier caché -->
 <button type="button" class="bouton bouton-secondaire" id="ajouter-photo" aria-label="Joindre des photos (4 maximum)">📎</button>
 <input type="file" id="photo" accept="image/*" multiple class="cache" aria-label="Choisir des photos">
+<!-- Voix : bouton d'enregistrement (affiché seulement si le navigateur sait enregistrer ou dicter) -->
+<button type="button" class="bouton bouton-secondaire cache" id="micro" aria-label="Enregistrer un message vocal" aria-pressed="false">
+<svg class="ic ic-micro" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+<svg class="ic ic-stop" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/></svg>
+<span class="ic ic-attente" aria-hidden="true"></span>
+</button>
 <textarea id="champ" rows="1" maxlength="2000" aria-label="Ton message" placeholder="Écris ton message…"></textarea>
 <button type="submit" class="bouton bouton-principal" id="envoyer" aria-label="Envoyer">↑</button>
 </form>
@@ -171,7 +192,8 @@ var $=function(id){return document.getElementById(id)};
 var tiroir=$("tiroir"),voile=$("voile"),listeConv=$("liste-conv");
 var messages=$("messages"),interieur=$("messages-interieur");
 var champ=$("champ"),boutonEnvoyer=$("envoyer"),titreConv=$("titre-conv");
-var boutonMenu=$("bouton-menu");
+var note=$("note-saisie"),boutonMenu=$("bouton-menu");
+var NOTE_INITIALE=note.textContent;
 var apercus=$("apercus"),boutonPhoto=$("ajouter-photo"),champPhoto=$("photo");
 var etat={utilisateur:null,convId:"",envoi:false,conversations:[]};
 var mobile=window.matchMedia("(max-width:959px)");
@@ -197,6 +219,76 @@ document.addEventListener("keydown",function(e){if(e.key==="Escape")fermerTiroir
 if(mobile.addEventListener)mobile.addEventListener("change",majTiroir);
 
 function defiler(){messages.scrollTop=messages.scrollHeight}
+
+/* ===== Voix : écouter les réponses (synthèse vocale du navigateur) ===== */
+var synthese=window.speechSynthesis||null;
+var voixFr=null;            /* voix française choisie */
+var lectureEnCours=null;    /* bouton « Écouter » dont la lecture est en cours */
+
+function choisirVoix(){
+if(!synthese)return;
+var voix=synthese.getVoices()||[];
+voixFr=voix.filter(function(v){return /^fr[-_]FR/i.test(v.lang)})[0]||voix.filter(function(v){return /^fr/i.test(v.lang)})[0]||null;
+}
+if(synthese){
+choisirVoix();
+if(synthese.addEventListener)synthese.addEventListener("voiceschanged",choisirVoix);
+}
+
+/* Retire ce qui ne doit pas être lu : mise en forme, liens, emojis */
+function nettoyerPourLecture(t){
+return String(t||"")
+.replace(/```[\s\S]*?```/g," ")
+.replace(/\[([^\]]+)\]\([^)]+\)/g,"$1")
+.replace(/https?:\/\/\S+/g," ")
+.replace(/[*_#`>~]+/g,"")
+.replace(/^\s*[-•]\s+/gm,"")
+.replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\uFE0F\u200D]/gu," ")
+.replace(/\s+/g," ").trim();
+}
+
+/* Découpe en morceaux courts (les longs textes sont parfois coupés par le navigateur) */
+function decouper(t,max){
+var phrases=t.match(/[^.!?;:]+[.!?;:]*\s*/g)||[t];
+var morceaux=[],courant="";
+phrases.forEach(function(p){
+if((courant+p).length>max&&courant){morceaux.push(courant);courant=p}
+else courant+=p;
+});
+if(courant)morceaux.push(courant);
+return morceaux;
+}
+
+function arreterLecture(){
+if(synthese)synthese.cancel();
+if(lectureEnCours){
+lectureEnCours.textContent="🔊 Écouter";
+lectureEnCours.setAttribute("aria-pressed","false");
+lectureEnCours=null;
+}
+}
+
+function lire(texte,bouton){
+if(!synthese)return;
+var memeBouton=lectureEnCours===bouton;
+arreterLecture();
+if(memeBouton)return;   /* second appui = arrêt */
+var propre=nettoyerPourLecture(texte);
+if(!propre)return;
+var morceaux=decouper(propre,220);
+lectureEnCours=bouton;
+bouton.textContent="⏹ Arrêter";
+bouton.setAttribute("aria-pressed","true");
+morceaux.forEach(function(m,i){
+var u=new SpeechSynthesisUtterance(m);
+u.lang="fr-FR";
+if(voixFr)u.voice=voixFr;
+if(i===morceaux.length-1){
+u.onend=u.onerror=function(){if(lectureEnCours===bouton)arreterLecture()};
+}
+synthese.speak(u);
+});
+}
 
 /* Photos : le 4e paramètre contient les vignettes locales d'un message de l'utilisateur */
 function ajouterBulle(role,texte,source,photosLocales){
@@ -224,6 +316,18 @@ span.className="etiquette-source";
 span.textContent=etiquette;
 bulle.appendChild(span);
 }
+/* Voix : bouton « Écouter » sous la réponse (si le navigateur sait lire à voix haute) */
+if(synthese&&texte){
+var actions=document.createElement("div");
+actions.className="actions-bulle";
+var ecouter=document.createElement("button");
+ecouter.type="button";ecouter.className="bouton bouton-secondaire ecouter";
+ecouter.textContent="🔊 Écouter";
+ecouter.setAttribute("aria-pressed","false");
+ecouter.addEventListener("click",function(){lire(texte,ecouter)});
+actions.appendChild(ecouter);
+bulle.appendChild(actions);
+}
 }
 interieur.appendChild(bulle);defiler();return bulle;
 }
@@ -242,7 +346,225 @@ z.setAttribute("role","alert");z.textContent=texte;
 interieur.appendChild(z);defiler();
 }
 
-/* Photos : lecture, réduction et conversion d'une photo en JPEG (base64) */
+/* ===== Voix : message vocal (enregistrement dans la page, transcription par Seno IA) ===== */
+var DUREE_MAX=90;              /* durée maximale d'un message vocal, en secondes */
+var TAUX_WAV=16000;            /* échantillonnage du fichier envoyé au serveur */
+var TAILLE_MAX_B64=4000000;    /* même limite que le serveur (caractères base64) */
+var Contexte=window.AudioContext||window.webkitAudioContext;
+var ContexteHors=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+var Reconnaissance=window.SpeechRecognition||window.webkitSpeechRecognition;
+var PeutEnregistrer=!!(window.MediaRecorder&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&Contexte&&ContexteHors);
+var micro=$("micro");
+/* Enregistrement si possible ; sinon dictée du navigateur en secours ; sinon le bouton reste caché */
+var modeMicro=PeutEnregistrer?"enregistrement":(Reconnaissance?"dictee":null);
+if(modeMicro)micro.classList.remove("cache");
+var etatMicro="repos";         /* "repos", "ecoute" ou "traite" */
+var flux=null,enregistreur=null,morceauxAudio=[],debut=0,minuteur=null;
+var abandon=false,arretAuto=false,demarrageEnCours=false;
+var reco=null,texteAvantDictee="";
+
+function majMicro(nouvelEtat,texteNote){
+etatMicro=nouvelEtat;
+micro.classList.toggle("ecoute",nouvelEtat==="ecoute");
+micro.classList.toggle("traite",nouvelEtat==="traite");
+micro.disabled=nouvelEtat==="traite";
+micro.setAttribute("aria-pressed",nouvelEtat==="ecoute"?"true":"false");
+micro.setAttribute("aria-label",nouvelEtat==="ecoute"?"Arrêter l'enregistrement":nouvelEtat==="traite"?"Transcription en cours":"Enregistrer un message vocal");
+boutonEnvoyer.disabled=nouvelEtat!=="repos"||etat.envoi;   /* pas d'envoi pendant l'enregistrement */
+note.textContent=texteNote||NOTE_INITIALE;
+}
+
+function mmss(secondes){
+secondes=Math.floor(secondes);
+return Math.floor(secondes/60)+":"+("0"+(secondes%60)).slice(-2);
+}
+
+function choisirTypeAudio(){
+var types=["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/ogg;codecs=opus"];
+for(var i=0;i<types.length;i++){
+if(MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(types[i]))return types[i];
+}
+return "";
+}
+
+function libererMicro(){
+if(minuteur){clearInterval(minuteur);minuteur=null}
+if(flux){flux.getTracks().forEach(function(piste){piste.stop()});flux=null}
+}
+
+/* Fichier WAV (16 bits, mono) à partir d'échantillons audio */
+function encoderWav(echantillons,taux){
+var n=echantillons.length;
+var tampon=new ArrayBuffer(44+n*2);
+var vue=new DataView(tampon);
+function ecrire(position,texte){for(var i=0;i<texte.length;i++)vue.setUint8(position+i,texte.charCodeAt(i))}
+ecrire(0,"RIFF");vue.setUint32(4,36+n*2,true);ecrire(8,"WAVE");
+ecrire(12,"fmt ");vue.setUint32(16,16,true);vue.setUint16(20,1,true);vue.setUint16(22,1,true);
+vue.setUint32(24,taux,true);vue.setUint32(28,taux*2,true);vue.setUint16(32,2,true);vue.setUint16(34,16,true);
+ecrire(36,"data");vue.setUint32(40,n*2,true);
+for(var i=0;i<n;i++){
+var s=Math.max(-1,Math.min(1,echantillons[i]));
+vue.setInt16(44+i*2,s<0?s*0x8000:s*0x7FFF,true);
+}
+return tampon;
+}
+
+/* Enregistrement du navigateur (webm, mp4, ogg…) converti en WAV 16 kHz mono */
+async function enregistrementEnWav(blob){
+var tampon=await blob.arrayBuffer();
+var ctx=new Contexte();
+var audio;
+try{
+audio=await new Promise(function(ok,ko){ctx.decodeAudioData(tampon,ok,ko)});
+}catch(e){
+throw new Error("Cet enregistrement n'a pas pu être lu sur ce navigateur. Essaie le micro de ton clavier.");
+}finally{
+if(ctx.close)ctx.close();
+}
+var longueur=Math.max(1,Math.ceil(audio.duration*TAUX_WAV));
+var hors=new ContexteHors(1,longueur,TAUX_WAV);
+var source=hors.createBufferSource();
+source.buffer=audio;
+source.connect(hors.destination);
+source.start(0);
+var rendu=await new Promise(function(ok,ko){
+var promesse=hors.startRendering();
+if(promesse&&promesse.then)promesse.then(ok,ko);
+else hors.oncomplete=function(e){ok(e.renderedBuffer)};
+});
+return encoderWav(rendu.getChannelData(0),TAUX_WAV);
+}
+
+function tamponEnBase64(tampon){
+return new Promise(function(ok,ko){
+var lecteur=new FileReader();
+lecteur.onload=function(){ok(String(lecteur.result).split(",")[1]||"")};
+lecteur.onerror=function(){ko(new Error("Lecture de l'enregistrement impossible."))};
+lecteur.readAsDataURL(new Blob([tampon],{type:"audio/wav"}));
+});
+}
+
+async function demarrerEnregistrement(){
+if(demarrageEnCours)return;
+demarrageEnCours=true;
+arreterLecture();
+try{
+try{
+flux=await navigator.mediaDevices.getUserMedia({audio:true});
+}catch(e){
+flux=null;
+ajouterErreur(e&&e.name==="NotFoundError"?"Aucun micro n'a été détecté.":"Autorise l'accès au micro dans ton navigateur pour enregistrer un message vocal.");
+return;
+}
+morceauxAudio=[];abandon=false;arretAuto=false;
+var type=choisirTypeAudio();
+try{
+enregistreur=type?new MediaRecorder(flux,{mimeType:type}):new MediaRecorder(flux);
+}catch(e){
+libererMicro();
+ajouterErreur("L'enregistrement n'est pas possible sur ce navigateur.");
+return;
+}
+enregistreur.ondataavailable=function(e){if(e.data&&e.data.size>0)morceauxAudio.push(e.data)};
+enregistreur.onstop=finEnregistrement;
+enregistreur.start();
+debut=Date.now();
+majMicro("ecoute","Enregistrement… 0:00 / "+mmss(DUREE_MAX)+" · touche le bouton pour arrêter");
+minuteur=setInterval(function(){
+var ecoule=(Date.now()-debut)/1000;
+if(ecoule>=DUREE_MAX){arretAuto=true;arreterEnregistrement();return}
+note.textContent="Enregistrement… "+mmss(ecoule)+" / "+mmss(DUREE_MAX)+" · touche le bouton pour arrêter";
+},250);
+}finally{
+demarrageEnCours=false;
+}
+}
+
+function arreterEnregistrement(){
+if(enregistreur&&enregistreur.state!=="inactive")enregistreur.stop();
+}
+
+/* L'enregistrement est terminé : conversion, envoi au serveur, transcription */
+async function finEnregistrement(){
+var duree=(Date.now()-debut)/1000;
+var type=(enregistreur&&enregistreur.mimeType)||"audio/webm";
+libererMicro();
+if(abandon){majMicro("repos");return}
+if(duree<0.7||!morceauxAudio.length){
+majMicro("repos");
+ajouterErreur("Enregistrement trop court. Touche le micro, parle, puis touche-le à nouveau.");
+return;
+}
+majMicro("traite",(arretAuto?"Durée maximale atteinte ("+mmss(DUREE_MAX)+"). ":"")+"Transcription en cours…");
+try{
+var wav=await enregistrementEnWav(new Blob(morceauxAudio,{type:type}));
+var b64=await tamponEnBase64(wav);
+if(b64.length>TAILLE_MAX_B64)throw new Error("L'enregistrement est trop long. Limite-toi à "+DUREE_MAX+" secondes.");
+var r=await JIA.appeler("audio_transcrire",{audio:b64,type:"audio/wav"});
+var dicte=((r&&r.texte)||"").trim();
+if(!dicte){
+ajouterErreur("Je n'ai rien entendu. Réessaie en parlant plus près du micro.");
+}else{
+var avant=champ.value?champ.value.replace(/\s+$/,"")+" ":"";
+champ.value=(avant+dicte).slice(0,2000);
+champ.dispatchEvent(new Event("input"));
+}
+}catch(e){
+ajouterErreur((e&&e.message)||"La transcription n'a pas fonctionné. Réessaie.");
+}
+majMicro("repos");
+champ.focus();
+}
+
+/* Secours : dictée du navigateur (si l'enregistrement n'est pas possible mais que la dictée l'est) */
+function basculerDictee(){
+if(etatMicro==="ecoute"){if(reco)reco.stop();return}
+arreterLecture();
+reco=new Reconnaissance();
+reco.lang="fr-FR";
+reco.interimResults=true;
+reco.continuous=false;
+reco.maxAlternatives=1;
+texteAvantDictee=champ.value?champ.value.replace(/\s+$/,"")+" ":"";
+reco.onresult=function(e){
+var dicte="";
+for(var i=0;i<e.results.length;i++)dicte+=e.results[i][0].transcript;
+champ.value=(texteAvantDictee+dicte).slice(0,2000);
+champ.dispatchEvent(new Event("input"));
+};
+reco.onerror=function(e){
+var textes={
+"not-allowed":"Autorise l'accès au micro dans ton navigateur pour dicter ton message.",
+"service-not-allowed":"La dictée n'est pas autorisée sur ce navigateur.",
+"no-speech":"Je n'ai rien entendu. Touche le micro et réessaie.",
+"audio-capture":"Aucun micro n'a été détecté.",
+"network":"La dictée a besoin d'une connexion Internet."
+};
+if(e.error!=="aborted")ajouterErreur(textes[e.error]||"La dictée n'a pas fonctionné. Réessaie.");
+};
+reco.onend=function(){majMicro("repos");champ.focus()};
+try{reco.start();majMicro("ecoute","Je t'écoute… parle, je m'arrête quand tu fais une pause.")}
+catch(err){majMicro("repos")}
+}
+
+/* Annule l'enregistrement en cours sans le transcrire (changement de conversation, page quittée) */
+function annulerMicro(){
+if(etatMicro!=="ecoute")return;
+if(modeMicro==="enregistrement"){abandon=true;arreterEnregistrement()}
+else if(reco){try{reco.abort()}catch(e){}}
+}
+
+micro.addEventListener("click",function(){
+if(etatMicro==="traite")return;
+if(modeMicro==="enregistrement"){
+if(etatMicro==="ecoute")arreterEnregistrement();
+else demarrerEnregistrement();
+}else if(modeMicro==="dictee"){
+basculerDictee();
+}
+});
+window.addEventListener("pagehide",function(){arreterLecture();annulerMicro()});
+  /* Photos : lecture, réduction et conversion d'une photo en JPEG (base64) */
 function lireFichier(fichier,maxCote,qualite){
 return new Promise(function(resolve,reject){
 var url=URL.createObjectURL(fichier);
@@ -363,6 +685,7 @@ etat.conversations=r.conversations||[];afficherConversations();
 }
 async function ouvrirConversation(id){
 if(etat.envoi)return;
+arreterLecture();annulerMicro();
 try{
 var r=await JIA.appeler("conversation_get",{conversation_id:id});
 etat.convId=id;interieur.textContent="";
@@ -375,6 +698,7 @@ afficherConversations();fermerTiroir();defiler();
 }
 function nouvelleConversation(){
 if(etat.envoi)return;
+arreterLecture();annulerMicro();
 etat.convId="";interieur.textContent="";
 afficherAccueil();titreConv.textContent="Nouvelle conversation";
 afficherConversations();fermerTiroir();champ.focus();
@@ -416,6 +740,7 @@ async function envoyer(texte,options){
 options=options||{};texte=(texte||"").trim();
 var avecPhotos=!options.recherche&&photos.length>0;
 if((!texte&&!avecPhotos)||etat.envoi)return;
+if(etatMicro!=="repos")return;   /* pas d'envoi pendant un enregistrement ou une transcription */
 etat.envoi=true;boutonEnvoyer.disabled=true;masquerAccueil();
 var envoyees=avecPhotos?photos.slice():[];
 var bulleUtilisateur=options.recherche?null:ajouterBulle("user",texte,null,envoyees);
@@ -447,7 +772,7 @@ if(envoyees.length){photos=envoyees;afficherApercus()} /* les photos reviennent 
 }
 ajouterErreur(e.message);
 }finally{
-etat.envoi=false;boutonEnvoyer.disabled=false;
+etat.envoi=false;boutonEnvoyer.disabled=etatMicro!=="repos";
 }
 }
 
