@@ -289,7 +289,7 @@ def chercher_connaissances(message):
     ensemble = set(mots)
     resultats = []
     for entree in candidats:
-        ressemblance = SequenceMatcher(None, message_norm, normaliser(entree.get("question", ""))).raphntio()
+        ressemblance = SequenceMatcher(None, message_norm, normaliser(entree.get("question", ""))).ratio()
         cles = set(normaliser(entree.get("mots_cles", "")).split())
         communs = len(ensemble & cles)
         if ressemblance >= 0.5 or communs >= 2:
