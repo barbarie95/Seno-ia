@@ -83,6 +83,8 @@ button,textarea{font:inherit}button{cursor:pointer}.cache{display:none!important
 .apercu span{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:#26345Bd9;color:#fff;font-size:12px;display:grid;place-items:center}
 .bulle-photos{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .bulle-photos img{width:88px;height:88px;object-fit:cover;border-radius:12px;display:block}
+/* Images créées par Seno IA : image dans la bulle (le bouton « Télécharger » reprend le style de « Écouter ») */
+.bulle-image{display:block;width:100%;max-width:420px;height:auto;margin-top:6px;border:1px solid var(--b);border-radius:16px;background:#F8FAFF}
 /* Voix : bouton d'enregistrement (icônes dessinées), ses états, et bouton « Écouter » sous les réponses */
 #micro{min-width:44px;height:44px;padding:0;border-radius:13px}
 #micro:disabled{opacity:.7;cursor:wait}
@@ -290,8 +292,20 @@ synthese.speak(u);
 });
 }
 
-/* Photos : le 4e paramètre contient les vignettes locales d'un message de l'utilisateur */
-function ajouterBulle(role,texte,source,photosLocales){
+/* Images créées : convertit l'image reçue (base64) en adresse utilisable dans la page */
+function imageEnUrl(image){
+try{
+var binaire=atob(image.data);
+var octets=new Uint8Array(binaire.length);
+for(var i=0;i<binaire.length;i++)octets[i]=binaire.charCodeAt(i);
+return URL.createObjectURL(new Blob([octets],{type:image.type||"image/jpeg"}));
+}catch(e){
+return "data:"+(image.type||"image/jpeg")+";base64,"+image.data;
+}
+}
+
+/* Photos : le 4e paramètre contient les vignettes locales d'un message de l'utilisateur ; le 5e, l'image créée par Seno IA */
+function ajouterBulle(role,texte,source,photosLocales,imageCreee){
 var bulle=document.createElement("div");
 bulle.className="bulle "+(role==="user"?"bulle-user":"bulle-ia");
 if(role==="user"){
@@ -316,8 +330,25 @@ span.className="etiquette-source";
 span.textContent=etiquette;
 bulle.appendChild(span);
 }
+/* Image créée par Seno IA : affichage et téléchargement (l'image n'est pas conservée dans l'historique) */
+if(imageCreee&&imageCreee.data){
+var adresseImage=imageEnUrl(imageCreee);
+var imageIA=document.createElement("img");
+imageIA.className="bulle-image";
+imageIA.src=adresseImage;imageIA.alt="Image créée par Seno IA";
+imageIA.addEventListener("load",defiler);
+bulle.appendChild(imageIA);
+var actionsImage=document.createElement("div");
+actionsImage.className="actions-bulle";
+var telecharger=document.createElement("a");
+telecharger.className="bouton bouton-secondaire ecouter";
+telecharger.href=adresseImage;telecharger.download="seno-ia-image.jpg";
+telecharger.textContent="⬇ Télécharger";
+actionsImage.appendChild(telecharger);
+bulle.appendChild(actionsImage);
+}
 /* Voix : bouton « Écouter » sous la réponse (si le navigateur sait lire à voix haute) */
-if(synthese&&texte){
+if(synthese&&texte&&!imageCreee){
 var actions=document.createElement("div");
 actions.className="actions-bulle";
 var ecouter=document.createElement("button");
@@ -756,7 +787,7 @@ var nouvelle=!etat.convId;
 etat.convId=r.conversation_id;
 if(r.propose_recherche)afficherProposition(texte);
 else{
-ajouterBulle("ia",r.reponse,r.source);
+ajouterBulle("ia",r.reponse,r.source,null,r.image);
 }
 if(nouvelle){
 await chargerConversations();
