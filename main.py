@@ -7,6 +7,8 @@ Le site appelle cette fonction avec un corps JSON : {"action": "...", ...}
 Actions pour les utilisateurs connectés :
   chat                 {message, conversation_id?, recherche?, images?}
                        images = [{"type": "image/jpeg", "data": "<base64>"}, ...] (4 maximum)
+                       Si le message demande de créer une image, la réponse contient aussi
+                       image = {"type": "image/jpeg", "data": "<base64>"} (jamais conservée).
   audio_transcrire     {audio, type}
                        audio = enregistrement vocal en base64 (WAV, 90 secondes maximum)
                        type  = "audio/wav" ; renvoie {texte}. L'audio n'est jamais conservé.
@@ -30,8 +32,10 @@ Limite quotidienne : une fiche "réponse exacte" dont la question est quasi iden
 (85 % de ressemblance) est renvoyée directement et ne compte pas. Toutes les autres
 réponses (Gemini, Tavily) comptent dans la limite de messages par jour. Chaque
 transcription vocale réussie compte aussi pour 1 message.
+Les images créées ont leurs propres limites par jour (par utilisateur et pour tout le site)
+et ne comptent pas dans les messages.
 
-Sécurité : aucune clé dans ce fichier. Les clés Gemini, Tavily et ElevenLabs sont lues
+Sécurité : aucune clé dans ce fichier. Les clés Gemini, Tavily, ElevenLabs et Cloudflare sont lues
 dans les variables secrètes de la fonction. Le site ne lit jamais la base
 directement : tout passe par cette fonction.
 """
@@ -65,12 +69,17 @@ MODELE = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
 CLE_GEMINI = os.environ.get("GEMINI_API_KEY", "")
 CLE_TAVILY = os.environ.get("TAVILY_API_KEY", "")
 CLE_ELEVENLABS = os.environ.get("ELEVENLABS_API_KEY", "")
+CLE_CLOUDFLARE_COMPTE = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
+CLE_CLOUDFLARE = os.environ.get("CLOUDFLARE_API_TOKEN", "")
 # Valeurs de secours si la table "reglages" est vide
 DEFAUT_MESSAGES = _entier(os.environ.get("MAX_MESSAGES_PAR_JOUR"), 20)
 DEFAUT_RECHERCHES = _entier(os.environ.get("MAX_RECHERCHES_PAR_MOIS"), 900)
+DEFAUT_IMAGES_UTILISATEUR = _entier(os.environ.get("MAX_IMAGES_PAR_JOUR"), 4)
+DEFAUT_IMAGES_TOTAL = _entier(os.environ.get("MAX_IMAGES_TOTAL_PAR_JOUR"), 150)
 
 JETON_RECHERCHE = "[[RECHERCHE_INTERNET]]"  # signal : Gemini ne peut pas savoir
 JETON_VIDE = "[[VIDE]]"                     # signal : aucune parole audible dans l'enregistrement
+JETON_IMAGE = re.compile(r"\[\[IMAGE:\s*(.+?)\]\]", re.DOTALL)  # signal : l'utilisateur demande une image
 LONGUEUR_MAX_MESSAGE = 2000
 SEUIL_EXACT = 0.85  # ressemblance minimale pour renvoyer une "réponse exacte"
 
@@ -87,6 +96,11 @@ TAILLE_MAX_AUDIO = 4000000                       # caractères base64 (environ 9
 # Transcription vocale par ElevenLabs
 MODELE_TRANSCRIPTION = "scribe_v1"               # modèle de transcription (modifiable ici)
 DELAI_TRANSCRIPTION = 22                         # secondes (l'exécution complète doit rester sous 30 s)
+
+# Création d'images par Cloudflare Workers AI
+MODELE_IMAGE = "@cf/black-forest-labs/flux-1-schnell"   # modèle de création d'images (modifiable ici)
+ETAPES_IMAGE = 4                                 # étapes de génération (4 = rapide, 8 = maximum)
+DELAI_IMAGE = 22                                 # secondes (l'exécution complète doit rester sous 30 s)
 
 # Contexte de la requête en cours (clé temporaire de la fonction, journal)
 CTX = {"ctx": None, "cle": ""}
@@ -321,7 +335,8 @@ def chercher_connaissances(message):
   # ---------------------------------------------------------------------------
 # Gemini et Tavily
 # ---------------------------------------------------------------------------
-def construire_consigne(profil, references, resultats_web, recherche_proposable, recherche_tentee, nb_images=0):
+def construire_consigne(profil, references, resultats_web, recherche_proposable, recherche_tentee, nb_images=0,
+                        image_possible=False):
     """Écrit les instructions données à Gemini."""
     lignes = [
         "Tu es Seno IA, un assistant intelligent, utile et fiable. Tu réponds en français clair et chaleureux, "
@@ -373,6 +388,15 @@ def construire_consigne(profil, references, resultats_web, recherche_proposable,
         for resultat in resultats_web:
             lignes.append("- " + str(resultat.get("title", "")) + " (" + str(resultat.get("url", "")) + ") : "
                           + str(resultat.get("content", ""))[:500])
+    if image_possible:
+        lignes.append("")
+        lignes.append("CRÉATION D'IMAGES : tu sais créer des images. Si l'utilisateur te demande de créer, générer, dessiner "
+                      "ou imaginer une image (illustration, logo, affiche, portrait imaginaire, paysage, personnage, etc.), "
+                      "réponds UNIQUEMENT par " + "[[IMAGE: description détaillée de l'image EN ANGLAIS]]" + ", sans rien d'autre : "
+                      "précise le sujet, le style, les couleurs, la lumière et la composition, et reprends fidèlement ce qu'il demande. "
+                      "Si la demande est inappropriée (contenu sexuel, violent ou haineux, ou personne réelle identifiable), "
+                      "refuse poliment par un texte normal, sans utiliser ce format. "
+                      "Si l'utilisateur pose une simple question sur les images sans en demander une, réponds normalement.")
     lignes.append("")
     if recherche_proposable and not recherche_tentee:
         lignes.append("Si la question demande une information récente ou en temps réel (actualité, prix du jour, résultats, "
@@ -451,6 +475,36 @@ def transcrire_audio(donnees, type_audio):
     return texte[:LONGUEUR_MAX_MESSAGE]
 
 
+def generer_image(description):
+    """Crée une image avec Cloudflare Workers AI. Renvoie l'image en base64 (JPEG)."""
+    if not (CLE_CLOUDFLARE_COMPTE and CLE_CLOUDFLARE):
+        journal("Variables CLOUDFLARE_ACCOUNT_ID ou CLOUDFLARE_API_TOKEN manquantes")
+        raise ErreurJupiter("La création d'images n'est pas disponible pour le moment.", 503)
+    url = "https://api.cloudflare.com/client/v4/accounts/" + CLE_CLOUDFLARE_COMPTE + "/ai/run/" + MODELE_IMAGE
+    try:
+        code, reponse = _requete(
+            "POST", url,
+            {"prompt": description[:2000], "steps": ETAPES_IMAGE},
+            {"Authorization": "Bearer " + CLE_CLOUDFLARE, "User-Agent": "SenoIA/1.0"},
+            delai=DELAI_IMAGE,
+        )
+    except Exception as erreur:
+        journal("Cloudflare injoignable : " + repr(erreur))
+        raise ErreurJupiter("Seno IA n'a pas pu créer l'image. Réessaie dans un instant.", 503)
+    if code >= 400:
+        journal("Cloudflare erreur " + str(code) + " : " + str(reponse)[:300])
+        raise ErreurJupiter("Seno IA n'a pas pu créer l'image. Réessaie dans un instant.", 503)
+    donnees = reponse if isinstance(reponse, dict) else {}
+    resultat = donnees.get("result")
+    if not isinstance(resultat, dict):
+        resultat = donnees
+    image = str(resultat.get("image") or "")
+    if len(image) < 100:
+        journal("Cloudflare : image absente de la réponse : " + str(reponse)[:300])
+        raise ErreurJupiter("Seno IA n'a pas pu créer l'image. Réessaie dans un instant.", 503)
+    return image
+
+
 def rechercher_internet(requete):
     """Recherche Tavily (1 crédit). Renvoie une liste de résultats, vide en cas d'échec."""
     try:
@@ -523,6 +577,39 @@ def lire_images(corps):
   # ---------------------------------------------------------------------------
 # Actions utilisateur
 # ---------------------------------------------------------------------------
+def extraire_demande_image(texte):
+    """Si Gemini a signalé une demande d'image, renvoie sa description (en anglais) ; sinon une chaîne vide."""
+    trouve = JETON_IMAGE.search(texte or "")
+    return trouve.group(1).strip() if trouve else ""
+
+
+def repondre_image(uid, conv_id, message, description):
+    """Crée l'image demandée, dans la limite des images par jour (par utilisateur et pour tout le site)."""
+    limite = lire_reglage("limite_images_jour", DEFAUT_IMAGES_UTILISATEUR)
+    limite_total = lire_reglage("limite_images_total_jour", DEFAUT_IMAGES_TOTAL)
+    id_utilisateur = id_court("img|" + uid + "|" + jour())
+    id_total = id_court("imgtotal|" + jour())
+    utilisees = compteur_lire(id_utilisateur, "nb_messages")  # les images ont leurs propres lignes de compteur
+    texte_limite = ""
+    if utilisees >= limite:
+        texte_limite = "Tu as atteint ta limite de " + str(limite) + " images pour aujourd'hui. Reviens demain !"
+    elif compteur_lire(id_total, "nb_messages") >= limite_total:
+        texte_limite = "La création d'images est très demandée aujourd'hui. Réessaie demain !"
+    if texte_limite:
+        enregistrer_message(conv_id, uid, "assistant", texte_limite, "gemini")
+        return {"ok": True, "conversation_id": conv_id, "reponse": texte_limite, "source": "gemini"}
+
+    image = generer_image(description)
+    compteur_ajouter(id_utilisateur, "nb_messages")
+    compteur_ajouter(id_total, "nb_messages")
+    utilisees += 1
+    # L'image n'est jamais conservée : l'historique garde seulement une ligne de texte
+    enregistrer_message(conv_id, uid, "assistant", "🎨 Image créée : " + message[:300], "gemini")
+    return {"ok": True, "conversation_id": conv_id, "reponse": "Voici ton image !", "source": "image",
+            "image": {"type": "image/jpeg", "data": image},
+            "images_restantes": max(limite - utilisees, 0)}
+
+
 def action_chat(uid, corps):
     message = (corps.get("message") or "").strip()
     images = lire_images(corps)
@@ -587,8 +674,15 @@ def action_chat(uid, corps):
     if images and historique and historique[-1].get("role") == "user":
         # Gemini reçoit le vrai texte de l'utilisateur (et non le libellé « 📷 … » de l'historique)
         historique[-1] = {"role": "user", "contenu": message or "Analyse ces photos et dis-moi ce que tu vois."}
-    consigne = construire_consigne(profil, references, resultats_web, recherche_possible, recherche_tentee, len(images))
+    image_possible = bool(CLE_CLOUDFLARE_COMPTE and CLE_CLOUDFLARE) and not images
+    consigne = construire_consigne(profil, references, resultats_web, recherche_possible, recherche_tentee, len(images),
+                                   image_possible)
     texte = appeler_gemini(consigne, historique, images)
+
+    # 6) Demande de création d'image : limites d'images, puis Cloudflare (ne compte pas dans les messages)
+    description_image = extraire_demande_image(texte) if image_possible else ""
+    if description_image:
+        return repondre_image(uid, conv_id, message, description_image)
 
     if JETON_RECHERCHE in texte:
         if recherche_possible and not recherche_tentee:
@@ -682,7 +776,8 @@ def action_profil_set(uid, corps):
 # ---------------------------------------------------------------------------
 # Actions administrateur
 # ---------------------------------------------------------------------------
-REGLAGES_AUTORISES = {"limite_messages_jour": (1, 1000), "limite_recherches_mois": (0, 100000)}
+REGLAGES_AUTORISES = {"limite_messages_jour": (1, 1000), "limite_recherches_mois": (0, 100000),
+                      "limite_images_jour": (0, 100), "limite_images_total_jour": (0, 5000)}
 
 
 def action_admin_stats(uid, corps):
@@ -699,7 +794,9 @@ def action_admin_stats(uid, corps):
 def action_admin_reglages_get(uid, corps):
     return {"ok": True,
             "limite_messages_jour": lire_reglage("limite_messages_jour", DEFAUT_MESSAGES),
-            "limite_recherches_mois": lire_reglage("limite_recherches_mois", DEFAUT_RECHERCHES)}
+            "limite_recherches_mois": lire_reglage("limite_recherches_mois", DEFAUT_RECHERCHES),
+            "limite_images_jour": lire_reglage("limite_images_jour", DEFAUT_IMAGES_UTILISATEUR),
+            "limite_images_total_jour": lire_reglage("limite_images_total_jour", DEFAUT_IMAGES_TOTAL)}
 
 
 def action_admin_reglages_set(uid, corps):
