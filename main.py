@@ -18,7 +18,10 @@ Actions pour les utilisateurs connectés :
   profil_get           {}
   profil_set           {nom, pays}
 
-Actions réservées au compte portant l'étiquette "admin" :
+Actions réservées au compte portant l'étiquette "admin" ET au code administrateur
+(chaque action ci-dessous doit aussi envoyer le champ "code" ; le code est la variable
+secrète ADMIN_CODE ; 5 codes faux par jour et par compte, puis blocage jusqu'au lendemain) :
+  admin_verifier       {code}
   admin_stats
   admin_reglages_get
   admin_reglages_set   {cle, valeur}
@@ -35,11 +38,12 @@ transcription vocale réussie compte aussi pour 1 message.
 Les images créées ont leurs propres limites par jour (par utilisateur et pour tout le site)
 et ne comptent pas dans les messages.
 
-Sécurité : aucune clé dans ce fichier. Les clés Gemini, Tavily, ElevenLabs et Cloudflare sont lues
-dans les variables secrètes de la fonction. Le site ne lit jamais la base
-directement : tout passe par cette fonction.
+Sécurité : aucune clé dans ce fichier. Les clés Gemini, Tavily, ElevenLabs et Cloudflare,
+ainsi que le code administrateur, sont lus dans les variables secrètes de la fonction.
+Le site ne lit jamais la base directement : tout passe par cette fonction.
 """
 import base64
+import hmac
 import json
 import os
 import re
@@ -71,6 +75,8 @@ CLE_TAVILY = os.environ.get("TAVILY_API_KEY", "")
 CLE_ELEVENLABS = os.environ.get("ELEVENLABS_API_KEY", "")
 CLE_CLOUDFLARE_COMPTE = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
 CLE_CLOUDFLARE = os.environ.get("CLOUDFLARE_API_TOKEN", "")
+CODE_ADMIN = os.environ.get("ADMIN_CODE", "")    # code administrateur (variable secrète)
+MAX_ESSAIS_CODE = 5                              # codes faux autorisés par jour et par compte
 # Valeurs de secours si la table "reglages" est vide
 DEFAUT_MESSAGES = _entier(os.environ.get("MAX_MESSAGES_PAR_JOUR"), 20)
 DEFAUT_RECHERCHES = _entier(os.environ.get("MAX_RECHERCHES_PAR_MOIS"), 900)
@@ -284,6 +290,29 @@ def est_admin(uid):
     """Vrai si le compte porte l'étiquette "admin" (vérifié côté serveur)."""
     utilisateur = aw("GET", "/users/" + uid)
     return "admin" in (utilisateur.get("labels") or [])
+
+
+def verifier_code_admin(uid, corps):
+    """Vérifie le code administrateur envoyé par la page (comparé à la variable secrète ADMIN_CODE).
+    Après MAX_ESSAIS_CODE codes faux dans la journée, le compte est bloqué jusqu'au lendemain."""
+    if not CODE_ADMIN:
+        journal("Variable ADMIN_CODE manquante : l'administration est fermée")
+        raise ErreurJupiter("Le code administrateur n'est pas configuré.", 500)
+    id_essais = id_court("admincode|" + uid + "|" + jour())  # ligne de compteur propre aux essais ratés
+    essais = compteur_lire(id_essais, "nb_messages")
+    if essais >= MAX_ESSAIS_CODE:
+        raise ErreurJupiter("Trop de codes incorrects. Accès bloqué jusqu'à demain.", 429)
+    code = str(corps.get("code") or "")
+    if not code:
+        raise ErreurJupiter("Entre le code administrateur.", 403)
+    if not hmac.compare_digest(code.encode("utf-8"), CODE_ADMIN.encode("utf-8")):
+        compteur_ajouter(id_essais, "nb_messages")
+        restants = MAX_ESSAIS_CODE - (essais + 1)
+        if restants > 0:
+            raise ErreurJupiter("Code incorrect. Il te reste " + str(restants) + " essai(s) aujourd'hui.", 403)
+        raise ErreurJupiter("Code incorrect. Accès bloqué jusqu'à demain.", 403)
+    if essais:
+        modifier("usage", id_essais, {"nb_messages": 0})  # bon code : on remet les essais ratés à zéro
 
 
 # ---------------------------------------------------------------------------
@@ -780,6 +809,11 @@ REGLAGES_AUTORISES = {"limite_messages_jour": (1, 1000), "limite_recherches_mois
                       "limite_images_jour": (0, 100), "limite_images_total_jour": (0, 5000)}
 
 
+def action_admin_verifier(uid, corps):
+    """Le compte et le code ont déjà été vérifiés avant d'arriver ici : on confirme simplement l'accès."""
+    return {"ok": True}
+
+
 def action_admin_stats(uid, corps):
     utilisateurs = aw("GET", "/users", params={"queries[]": [json.dumps(q_limite(1))]}).get("total", 0)
     return {"ok": True,
@@ -900,6 +934,7 @@ ACTIONS_UTILISATEUR = {
     "profil_set": action_profil_set,
 }
 ACTIONS_ADMIN = {
+    "admin_verifier": action_admin_verifier,
     "admin_stats": action_admin_stats,
     "admin_reglages_get": action_admin_reglages_get,
     "admin_reglages_set": action_admin_reglages_set,
@@ -943,6 +978,7 @@ def main(context):
         elif action in ACTIONS_ADMIN:
             if not est_admin(uid):
                 return context.res.json({"ok": False, "erreur": "Accès réservé à l'administrateur."}, 403)
+            verifier_code_admin(uid, corps)  # compte admin ET bon code, sinon refus
             resultat = ACTIONS_ADMIN[action](uid, corps)
         else:
             return context.res.json({"ok": False, "erreur": "Action inconnue."}, 400)
