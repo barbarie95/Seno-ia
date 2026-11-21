@@ -44,7 +44,21 @@
       <p class="discret" style="margin-bottom:18px">Réservée à l'administrateur de Seno IA.</p>
       <div id="msg-global" class="cache" aria-live="polite"></div>
 
-      <!-- Le contenu reste caché tant que le statut d'administrateur n'est pas confirmé -->
+      <!-- Écran du code administrateur : le contenu reste caché tant que le serveur n'a pas validé le code -->
+      <section id="carte-code" class="carte cache" aria-labelledby="titre-code" style="max-width:420px">
+        <h2 id="titre-code">Code administrateur</h2>
+        <p class="discret" style="margin-bottom:12px">Entre ton code pour ouvrir l'administration.</p>
+        <div id="msg-code" class="cache" aria-live="polite"></div>
+        <form id="form-code" novalidate>
+          <div class="champ">
+            <label for="c-code">Code</label>
+            <input id="c-code" type="password" autocomplete="off" maxlength="100" required>
+          </div>
+          <button id="c-valider" type="submit" class="bouton bouton-principal">Ouvrir l'administration</button>
+        </form>
+      </section>
+
+      <!-- Le contenu reste caché tant que le code n'est pas validé -->
       <div id="contenu-admin" class="cache">
 
         <!-- Onglets -->
@@ -200,6 +214,16 @@
                 <input id="l-recherches" type="number" inputmode="numeric" min="0" max="100000" required>
                 <p class="discret" style="margin-top:6px">Chaque recherche utilise 1 crédit Tavily : vérifie ton offre Tavily avant d'augmenter ce plafond.</p>
               </div>
+              <div class="champ">
+                <label for="l-images">Images par jour et par utilisateur (0 à 100)</label>
+                <input id="l-images" type="number" inputmode="numeric" min="0" max="100" required>
+                <p class="discret" style="margin-top:6px">Les images ont leur propre compteur : elles ne sont pas comptées dans les messages.</p>
+              </div>
+              <div class="champ">
+                <label for="l-images-total">Images par jour pour tout le site (0 à 5000)</label>
+                <input id="l-images-total" type="number" inputmode="numeric" min="0" max="5000" required>
+                <p class="discret" style="margin-top:6px">Le quota gratuit de Cloudflare permet environ 170 images par jour (estimation) : garde une marge sous ce chiffre.</p>
+              </div>
               <button id="l-enregistrer" type="submit" class="bouton bouton-principal">Enregistrer les limites</button>
             </form>
           </div>
@@ -232,6 +256,37 @@
           .replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
       }
 
+      /* ---------- Code administrateur (vérifié par le serveur ; gardé seulement en mémoire) ---------- */
+      var codeAdmin = "";
+      // Toutes les actions d'administration envoient le code au serveur
+      function appelerAdmin(action, donnees) {
+        var corps = Object.assign({}, donnees || {});
+        corps.code = codeAdmin;
+        return JIA.appeler(action, corps);
+      }
+      $("form-code").addEventListener("submit", async function (e) {
+        e.preventDefault();
+        var zone = $("msg-code");
+        var bouton = $("c-valider");
+        var saisi = $("c-code").value;
+        if (!saisi) return JIA.message(zone, "Entre le code administrateur.");
+        JIA.message(zone, "");
+        JIA.occupe(bouton, true, "Vérification…");
+        codeAdmin = saisi;
+        try {
+          await appelerAdmin("admin_verifier");
+          $("c-code").value = "";
+          $("carte-code").classList.add("cache");
+          $("contenu-admin").classList.remove("cache");
+          chargerStats();
+        } catch (erreur) {
+          codeAdmin = "";
+          $("c-code").value = "";
+          JIA.message(zone, erreur.message);
+        }
+        JIA.occupe(bouton, false);
+      });
+
       /* ---------- Onglets ---------- */
       var NOMS = ["tableau", "fiches", "limites"];
       var charge = { fiches: false };
@@ -254,7 +309,7 @@
         var zone = $("msg-tableau");
         JIA.message(zone, "");
         try {
-          var s = await JIA.appeler("admin_stats");
+          var s = await appelerAdmin("admin_stats");
           $("st-utilisateurs").textContent = nombre(s.utilisateurs);
           $("st-conversations").textContent = nombre(s.conversations);
           $("st-messages").textContent = nombre(s.messages);
@@ -305,7 +360,7 @@
         basculer.addEventListener("click", async function () {
           JIA.occupe(basculer, true, "…");
           try {
-            await JIA.appeler("admin_connaissances_update", {
+            await appelerAdmin("admin_connaissances_update", {
               id: f.id, question: f.question, reponse: f.reponse, mots_cles: f.mots_cles || "",
               categorie: f.categorie || "", pays: f.pays || "", reponse_exacte: !!f.reponse_exacte, actif: !f.actif
             });
@@ -322,7 +377,7 @@
           if (!confirm("Supprimer cette fiche ? Cette action est définitive.")) return;
           JIA.occupe(supprimerBtn, true, "…");
           try {
-            await JIA.appeler("admin_connaissances_delete", { id: f.id });
+            await appelerAdmin("admin_connaissances_delete", { id: f.id });
             await chargerFiches();
             JIA.message($("msg-fiches"), "Fiche supprimée.", "ok");
           } catch (erreur) {
@@ -342,7 +397,7 @@
         var zone = $("msg-fiches");
         JIA.message(zone, "");
         try {
-          var r = await JIA.appeler("admin_connaissances_list", { decalage: etat.decalage, recherche: etat.recherche });
+          var r = await appelerAdmin("admin_connaissances_list", { decalage: etat.decalage, recherche: etat.recherche });
           etat.total = r.total || 0;
           var liste = $("liste-fiches");
           liste.textContent = "";
@@ -372,8 +427,7 @@
         etat.decalage += PAGE;
         chargerFiches();
       });
-
-      /* ---------- Connaissances : formulaire ---------- */
+            /* ---------- Connaissances : formulaire ---------- */
       function ouvrirFormulaire(f) {
         etat.edition = f ? f.id : null;
         $("titre-form").textContent = f ? "Modifier la fiche" : "Nouvelle fiche";
@@ -418,9 +472,9 @@
         try {
           if (modification) {
             donnees.id = etat.edition;
-            await JIA.appeler("admin_connaissances_update", donnees);
+            await appelerAdmin("admin_connaissances_update", donnees);
           } else {
-            await JIA.appeler("admin_connaissances_add", donnees);
+            await appelerAdmin("admin_connaissances_add", donnees);
           }
           fermerFormulaire();
           await chargerFiches();
@@ -481,7 +535,7 @@
         var importees = 0, erreurs = [];
         try {
           for (var i = 0; i < lot.length; i += 50) {  // le serveur accepte 50 fiches par envoi
-            var r = await JIA.appeler("admin_connaissances_import", { items: lot.slice(i, i + 50) });
+            var r = await appelerAdmin("admin_connaissances_import", { items: lot.slice(i, i + 50) });
             importees += r.importees || 0;
             (r.erreurs || []).forEach(function (m) { erreurs.push(m); });
           }
@@ -502,9 +556,11 @@
         var zone = $("msg-limites");
         JIA.message(zone, "");
         try {
-          var r = await JIA.appeler("admin_reglages_get");
+          var r = await appelerAdmin("admin_reglages_get");
           $("l-messages").value = r.limite_messages_jour;
           $("l-recherches").value = r.limite_recherches_mois;
+          $("l-images").value = r.limite_images_jour;
+          $("l-images-total").value = r.limite_images_total_jour;
         } catch (erreur) {
           JIA.message(zone, erreur.message);
         }
@@ -515,13 +571,19 @@
         var bouton = $("l-enregistrer");
         var messages = parseInt($("l-messages").value, 10);
         var recherches = parseInt($("l-recherches").value, 10);
+        var images = parseInt($("l-images").value, 10);
+        var imagesTotal = parseInt($("l-images-total").value, 10);
         if (isNaN(messages) || messages < 1 || messages > 1000) return JIA.message(zone, "Les messages par jour doivent être compris entre 1 et 1000.");
         if (isNaN(recherches) || recherches < 0 || recherches > 100000) return JIA.message(zone, "Les recherches par mois doivent être comprises entre 0 et 100000.");
+        if (isNaN(images) || images < 0 || images > 100) return JIA.message(zone, "Les images par jour et par utilisateur doivent être comprises entre 0 et 100.");
+        if (isNaN(imagesTotal) || imagesTotal < 0 || imagesTotal > 5000) return JIA.message(zone, "Les images par jour pour tout le site doivent être comprises entre 0 et 5000.");
         JIA.message(zone, "");
         JIA.occupe(bouton, true, "Enregistrement…");
         try {
-          await JIA.appeler("admin_reglages_set", { cle: "limite_messages_jour", valeur: messages });
-          await JIA.appeler("admin_reglages_set", { cle: "limite_recherches_mois", valeur: recherches });
+          await appelerAdmin("admin_reglages_set", { cle: "limite_messages_jour", valeur: messages });
+          await appelerAdmin("admin_reglages_set", { cle: "limite_recherches_mois", valeur: recherches });
+          await appelerAdmin("admin_reglages_set", { cle: "limite_images_jour", valeur: images });
+          await appelerAdmin("admin_reglages_set", { cle: "limite_images_total_jour", valeur: imagesTotal });
           JIA.message(zone, "Les limites ont été enregistrées.", "ok");
         } catch (erreur) {
           JIA.message(zone, erreur.message);
@@ -529,15 +591,15 @@
         JIA.occupe(bouton, false);
       });
 
-      /* ---------- Démarrage : accès réservé à l'administrateur ---------- */
+      /* ---------- Démarrage : compte administrateur, puis code administrateur ---------- */
       (async function () {
         try {
           var utilisateur = await JIA.exigerConnexion();
           if (!utilisateur) return;  // redirigé vers la connexion
           if (!JIA.estAdmin(utilisateur)) { window.location.replace("chat.html"); return; }
           $("page").removeAttribute("aria-busy");
-          $("contenu-admin").classList.remove("cache");
-          chargerStats();
+          $("carte-code").classList.remove("cache");  // le contenu s'ouvre seulement après le code
+          $("c-code").focus();
         } catch (erreur) {
           JIA.message($("msg-global"), "Impossible de démarrer l'administration : " + erreur.message);
         }
